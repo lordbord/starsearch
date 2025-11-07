@@ -33,6 +33,7 @@ type Model struct {
 	statusBar      *ui.StatusBar
 	helpModal      *ui.HelpModal
 	inputModal     *ui.InputModal
+	bookmarksModal *ui.BookmarksModal
 	width          int
 	height         int
 	currentURL     string
@@ -41,6 +42,7 @@ type Model struct {
 	linkInput      string
 	showHelp       bool   // Whether to show the help modal
 	showInput      bool   // Whether to show the input modal
+	showBookmarks  bool   // Whether to show the bookmarks modal
 	pendingInputURL string // URL that triggered input request
 	quitting       bool
 	isNavigating   bool   // Whether currently navigating (to avoid adding to history during back/forward)
@@ -87,20 +89,22 @@ func NewModel() (*Model, error) {
 	statusBar := ui.NewStatusBar(80)
 	helpModal := ui.NewHelpModal()
 	inputModal := ui.NewInputModal()
+	bookmarksModal := ui.NewBookmarksModal()
 
 	return &Model{
-		client:       client,
-		gopherClient: gopherClient,
-		tofuStore:    tofuStore,
-		history:      history,
-		bookmarks:    bookmarks,
-		addressBar:   addressBar,
-		viewport:     viewport,
-		statusBar:    statusBar,
-		helpModal:    helpModal,
-		inputModal:   inputModal,
-		width:        80,
-		height:       24,
+		client:         client,
+		gopherClient:   gopherClient,
+		tofuStore:      tofuStore,
+		history:        history,
+		bookmarks:      bookmarks,
+		addressBar:     addressBar,
+		viewport:       viewport,
+		statusBar:      statusBar,
+		helpModal:      helpModal,
+		inputModal:     inputModal,
+		bookmarksModal: bookmarksModal,
+		width:          80,
+		height:         24,
 	}, nil
 }
 
@@ -115,6 +119,20 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
+		// If bookmarks modal is showing, handle it first
+		if m.showBookmarks {
+			var cmd tea.Cmd
+			m.bookmarksModal, cmd = m.bookmarksModal.Update(msg)
+			if cmd != nil {
+				cmds = append(cmds, cmd)
+			}
+			// Check if modal was closed
+			if !m.bookmarksModal.IsVisible() {
+				m.showBookmarks = false
+			}
+			return m, tea.Batch(cmds...)
+		}
+
 		// If input modal is showing, handle it first
 		if m.showInput {
 			var cmd tea.Cmd
@@ -287,6 +305,14 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.showHelp = !m.showHelp
 				return m, nil
 			}
+
+		case "b":
+			// Toggle bookmarks modal
+			if !m.addressBar.IsFocused() && !m.linkNumbers {
+				m.showBookmarks = true
+				m.bookmarksModal.Show(m.bookmarks.GetAll())
+				return m, nil
+			}
 		}
 
 	case tea.WindowSizeMsg:
@@ -308,6 +334,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.statusBar.SetWidth(m.width)
 		m.helpModal.SetSize(m.width, m.height)
 		m.inputModal.SetSize(m.width, m.height)
+		m.bookmarksModal.SetSize(m.width, m.height)
 
 		return m, nil
 
@@ -328,6 +355,23 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.showInput = false
 		m.pendingInputURL = ""
 		m.statusBar.SetMessage("Input cancelled")
+		return m, nil
+
+	case ui.BookmarkSelectedMsg:
+		// User selected a bookmark to navigate to
+		m.showBookmarks = false
+		m.statusBar.SetMessage("Navigating to bookmark...")
+		return m, m.navigate(msg.URL)
+
+	case ui.BookmarkDeleteMsg:
+		// User deleted a bookmark
+		if err := m.bookmarks.Remove(msg.URL); err == nil {
+			m.statusBar.SetMessage("Bookmark deleted")
+			// Refresh the bookmarks modal with updated list
+			m.bookmarksModal.Show(m.bookmarks.GetAll())
+		} else {
+			m.statusBar.SetError("Failed to delete bookmark")
+		}
 		return m, nil
 
 	case ui.NavigateMsg:
@@ -475,6 +519,11 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m *Model) View() string {
 	if m.quitting {
 		return "Thanks for using starsearch!\n"
+	}
+
+	// Show bookmarks modal if active (highest priority for overlay)
+	if m.showBookmarks {
+		return m.bookmarksModal.View()
 	}
 
 	// Show input modal if active

@@ -97,6 +97,8 @@ func (h *HelpModal) View() string {
 	content.WriteString("\n")
 	content.WriteString(keyStyle.Render("D") + descStyle.Render("Toggle bookmark"))
 	content.WriteString("\n")
+	content.WriteString(keyStyle.Render("B") + descStyle.Render("View bookmarks"))
+	content.WriteString("\n")
 	content.WriteString(keyStyle.Render("?") + descStyle.Render("Show this help"))
 	content.WriteString("\n")
 	content.WriteString(keyStyle.Render("Esc") + descStyle.Render("Exit link mode / Close help"))
