@@ -116,6 +116,72 @@ func (m *BookmarksModal) Update(msg tea.Msg) (*BookmarksModal, tea.Cmd) {
 			}
 			return m, nil
 		}
+
+	case tea.MouseMsg:
+		if msg.Type == tea.MouseLeft && len(m.bookmarks) > 0 {
+			// Calculate modal position and dimensions
+			modalWidth := m.width - 4
+			if modalWidth < 40 {
+				modalWidth = 40
+			}
+			if modalWidth > 100 {
+				modalWidth = 100
+			}
+
+			modalHeight := m.height - 4
+			if modalHeight < 10 {
+				modalHeight = 10
+			}
+
+			// Calculate visible height for bookmarks
+			visibleHeight := modalHeight - 8
+			if visibleHeight < 1 {
+				visibleHeight = 1
+			}
+
+			// Calculate top padding (modal is centered)
+			// Approximate content height - border (2) + padding (2) + title (2) + help (2) + bookmarks
+			endIdx := m.scrollOffset + visibleHeight
+			if endIdx > len(m.bookmarks) {
+				endIdx = len(m.bookmarks)
+			}
+			visibleBookmarks := endIdx - m.scrollOffset
+			contentHeight := 2 + 2 + 2 + 2 + (visibleBookmarks * 2)
+			if m.scrollOffset > 0 {
+				contentHeight++ // scroll indicator
+			}
+			if endIdx < len(m.bookmarks) {
+				contentHeight++ // scroll indicator
+			}
+
+			topPadding := (m.height - contentHeight) / 2
+			if topPadding < 0 {
+				topPadding = 0
+			}
+
+			// Calculate where bookmarks start
+			// topPadding + border (1) + padding (1) + title (2) + potential scroll indicator
+			bookmarksStartY := topPadding + 1 + 1 + 2
+			if m.scrollOffset > 0 {
+				bookmarksStartY++ // scroll indicator above
+			}
+
+			// Check if click is within bookmark area
+			if msg.Y >= bookmarksStartY {
+				// Calculate which bookmark was clicked (each bookmark is 2 lines tall)
+				relativeY := msg.Y - bookmarksStartY
+				clickedIdx := m.scrollOffset + (relativeY / 2)
+
+				// Check if the clicked index is valid
+				if clickedIdx >= 0 && clickedIdx < len(m.bookmarks) {
+					url := m.bookmarks[clickedIdx].URL
+					m.Hide()
+					return m, func() tea.Msg {
+						return BookmarkSelectedMsg{URL: url}
+					}
+				}
+			}
+		}
 	}
 
 	return m, nil
@@ -175,6 +241,7 @@ func (m *BookmarksModal) View() string {
 		Width(modalWidth - 4)
 
 	normalStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("15")).
 		Width(modalWidth - 4)
 
 	emptyStyle := lipgloss.NewStyle().
@@ -186,7 +253,7 @@ func (m *BookmarksModal) View() string {
 		MarginBottom(2)
 
 	helpStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("8")).
+		Foreground(lipgloss.Color("7")).
 		Width(modalWidth).
 		Align(lipgloss.Center).
 		MarginTop(1)

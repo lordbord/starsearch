@@ -16,6 +16,7 @@ import (
 
 	"starsearch/internal/gemini"
 	"starsearch/internal/gopher"
+	"starsearch/internal/renderer"
 	"starsearch/internal/storage"
 	"starsearch/internal/types"
 	"starsearch/internal/ui"
@@ -309,6 +310,8 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "b":
 			// Toggle bookmarks modal
 			if !m.addressBar.IsFocused() && !m.linkNumbers {
+				// Close help modal if open
+				m.showHelp = false
 				m.showBookmarks = true
 				m.bookmarksModal.Show(m.bookmarks.GetAll())
 				return m, nil
@@ -418,28 +421,74 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Handle Gemini protocol (default)
 		// Handle different status codes
 		if gemini.IsSuccessStatus(msg.resp.Status) {
-			// Parse the document
-			parser := gemini.NewParser(msg.resp.URL)
-			doc, err := parser.Parse(msg.resp)
-			if err != nil {
-				m.statusBar.SetError(fmt.Sprintf("Failed to parse document: %v", err))
-				return m, nil
+			mimeType := gemini.GetMIMEType(msg.resp)
+
+			// Check if this is an image
+			if renderer.IsImageMIME(mimeType) {
+				// Render image
+				imgRenderer := renderer.NewImageRenderer(m.width-4, m.height-8)
+				renderedImage, err := imgRenderer.RenderImage(msg.resp.Body)
+				if err != nil {
+					m.statusBar.SetError(fmt.Sprintf("Failed to render image: %v", err))
+					return m, nil
+				}
+
+				// Create a document with the rendered image as preformatted text
+				doc := &types.Document{
+					URL:      msg.resp.URL,
+					RawBody:  msg.resp.Body,
+					MIMEType: mimeType,
+					Lines:    []types.Line{},
+					Links:    []types.Line{},
+				}
+
+				// Split rendered image into lines
+				for _, line := range strings.Split(renderedImage, "\n") {
+					doc.Lines = append(doc.Lines, types.Line{
+						Type: types.LineText,
+						Text: line,
+						Raw:  line,
+					})
+				}
+
+				m.currentDoc = doc
+				m.currentURL = msg.resp.URL
+				m.viewport.SetDocument(doc)
+				m.statusBar.SetURL(m.currentURL)
+
+				// Use filename or URL as title
+				title := msg.resp.URL
+				m.statusBar.SetMessage(fmt.Sprintf("Image loaded: %s", mimeType))
+
+				// Add to history
+				if !m.isNavigating {
+					m.history.Add(m.currentURL, title)
+				}
+				m.isNavigating = false
+			} else {
+				// Parse text document
+				parser := gemini.NewParser(msg.resp.URL)
+				doc, err := parser.Parse(msg.resp)
+				if err != nil {
+					m.statusBar.SetError(fmt.Sprintf("Failed to parse document: %v", err))
+					return m, nil
+				}
+
+				m.currentDoc = doc
+				m.currentURL = msg.resp.URL
+				m.viewport.SetDocument(doc)
+				m.statusBar.SetURL(m.currentURL)
+
+				// Get title for status
+				title := gemini.GetTitle(doc)
+				m.statusBar.SetMessage(fmt.Sprintf("Loaded: %s", title))
+
+				// Add to history (unless we're navigating back/forward)
+				if !m.isNavigating {
+					m.history.Add(m.currentURL, title)
+				}
+				m.isNavigating = false
 			}
-
-			m.currentDoc = doc
-			m.currentURL = msg.resp.URL
-			m.viewport.SetDocument(doc)
-			m.statusBar.SetURL(m.currentURL)
-
-			// Get title for status
-			title := gemini.GetTitle(doc)
-			m.statusBar.SetMessage(fmt.Sprintf("Loaded: %s", title))
-
-			// Add to history (unless we're navigating back/forward)
-			if !m.isNavigating {
-				m.history.Add(m.currentURL, title)
-			}
-			m.isNavigating = false
 
 		} else if gemini.IsRedirectStatus(msg.resp.Status) {
 			// Handle redirect
@@ -478,6 +527,20 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case tea.MouseMsg:
+		// If bookmarks modal is showing, handle mouse events there
+		if m.showBookmarks {
+			var cmd tea.Cmd
+			m.bookmarksModal, cmd = m.bookmarksModal.Update(msg)
+			if cmd != nil {
+				cmds = append(cmds, cmd)
+			}
+			// Check if modal was closed
+			if !m.bookmarksModal.IsVisible() {
+				m.showBookmarks = false
+			}
+			return m, tea.Batch(cmds...)
+		}
+
 		// Check if click is on address bar (first 3 lines)
 		if msg.Type == tea.MouseLeft && msg.Y <= 2 && !m.addressBar.IsFocused() {
 			// Focus address bar, same as Ctrl+L
