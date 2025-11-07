@@ -1,5 +1,5 @@
 # Binaries
-starsearch
+/starsearch
 *.exe
 *.exe~
 *.dll
