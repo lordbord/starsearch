@@ -559,14 +559,17 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 
-				m.currentDoc = doc
-				m.currentURL = msg.resp.URL
-				m.viewport.SetDocument(doc)
-				m.statusBar.SetURL(m.currentURL)
+			m.currentDoc = doc
+			m.currentURL = msg.resp.URL
+			m.viewport.SetDocument(doc)
+			m.statusBar.SetURL(m.currentURL)
+			if !m.addressBar.IsFocused() {
+				m.addressBar.SetValue(m.currentURL)
+			}
 
-				// Get title from URL for Gopher
-				title := msg.resp.URL
-				m.statusBar.SetMessage(fmt.Sprintf("Loaded: %s", title))
+			// Get title from URL for Gopher
+			title := msg.resp.URL
+			m.statusBar.SetMessage(fmt.Sprintf("Loaded: %s", title))
 
 				// Add to history (unless we're navigating back/forward)
 				if !m.isNavigating {
@@ -613,14 +616,17 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					})
 				}
 
-				m.currentDoc = doc
-				m.currentURL = msg.resp.URL
-				m.viewport.SetDocument(doc)
-				m.statusBar.SetURL(m.currentURL)
+			m.currentDoc = doc
+			m.currentURL = msg.resp.URL
+			m.viewport.SetDocument(doc)
+			m.statusBar.SetURL(m.currentURL)
+			if !m.addressBar.IsFocused() {
+				m.addressBar.SetValue(m.currentURL)
+			}
 
-					// Use filename or URL as title
-					title := msg.resp.URL
-					m.statusBar.SetMessage(fmt.Sprintf("Image loaded: %s", mimeType))
+				// Use filename or URL as title
+				title := msg.resp.URL
+				m.statusBar.SetMessage(fmt.Sprintf("Image loaded: %s", mimeType))
 
 					// Add to history
 					if !m.isNavigating {
@@ -639,14 +645,17 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return m, nil
 				}
 
-				m.currentDoc = doc
-				m.currentURL = msg.resp.URL
-				m.viewport.SetDocument(doc)
-				m.statusBar.SetURL(m.currentURL)
+			m.currentDoc = doc
+			m.currentURL = msg.resp.URL
+			m.viewport.SetDocument(doc)
+			m.statusBar.SetURL(m.currentURL)
+			if !m.addressBar.IsFocused() {
+				m.addressBar.SetValue(m.currentURL)
+			}
 
-					// Get title for status
-					title := gemini.GetTitle(doc)
-					m.statusBar.SetMessage(fmt.Sprintf("Loaded: %s", title))
+				// Get title for status
+				title := gemini.GetTitle(doc)
+				m.statusBar.SetMessage(fmt.Sprintf("Loaded: %s", title))
 
 					// Add to history (unless we're navigating back/forward)
 					if !m.isNavigating {
