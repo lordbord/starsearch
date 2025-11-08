@@ -245,7 +245,7 @@ Contributions are welcome! This is a personal project but feel free to:
 
 ## License
 
-[Add your chosen license here]
+MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## Acknowledgments
 
