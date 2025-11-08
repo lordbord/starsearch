@@ -1,6 +1,11 @@
 # starsearch - A Gemini Browser for the Terminal
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Go Version](https://img.shields.io/badge/Go-1.24%2B-blue.svg)](https://go.dev/)
+
 A modern, feature-rich Gemini protocol browser built with Go and Bubble Tea TUI framework. Browse Geminispace with full mouse and keyboard support, TOFU certificate handling, and a beautiful terminal interface.
+
+**Available on Linux, macOS, and Windows** through multiple package managers including AUR, Homebrew, and Chocolatey.
 
 ## Features
 
@@ -19,14 +24,65 @@ A modern, feature-rich Gemini protocol browser built with Go and Bubble Tea TUI 
 
 ## Installation
 
-### Prerequisites
+Starsearch is available for **Linux**, **macOS**, and **Windows** through multiple package managers.
 
-- Go 1.21 or higher
+### Linux
+
+#### Arch Linux (AUR)
+
+```bash
+# Using yay
+yay -S starsearch
+
+# Using paru
+paru -S starsearch
+```
+
+#### Other Linux Distributions (via Homebrew)
+
+```bash
+brew tap lordbord/starsearch
+brew install starsearch
+```
+
+### macOS
+
+#### Using Homebrew
+
+```bash
+brew tap lordbord/starsearch
+brew install starsearch
+```
+
+### Windows
+
+#### Using Chocolatey
+
+```powershell
+choco install starsearch
+```
+
+### Pre-built Binaries
+
+Pre-built binaries for all platforms are available on the [Releases page](https://github.com/lordbord/starsearch/releases).
+
+1. Download the appropriate archive for your system:
+   - **Linux (x86_64)**: `starsearch-VERSION-linux-amd64.tar.gz`
+   - **Linux (ARM64)**: `starsearch-VERSION-linux-arm64.tar.gz`
+   - **macOS (Intel)**: `starsearch-VERSION-darwin-amd64.tar.gz`
+   - **macOS (Apple Silicon)**: `starsearch-VERSION-darwin-arm64.tar.gz`
+   - **Windows (x86_64)**: `starsearch-VERSION-windows-amd64.zip`
+2. Extract the binary
+3. Move it to a directory in your PATH
+4. (Optional) Verify the checksum from `checksums.txt`
 
 ### Build from Source
 
+Requires Go 1.24 or higher:
+
 ```bash
-# Clone or navigate to the repository
+# Clone the repository
+git clone https://github.com/lordbord/starsearch.git
 cd starsearch
 
 # Build the binary
@@ -34,11 +90,8 @@ go build -o starsearch ./cmd/starsearch
 
 # Run the browser
 ./starsearch
-```
 
-### Install Globally
-
-```bash
+# Or install globally
 go install ./cmd/starsearch
 ```
 
@@ -188,16 +241,26 @@ timeout = 30
 
 ## Development Status
 
-🎉 **All Major Features Complete!**
+### ✅ v0.1.0 - Ready for Release!
 
-The browser now includes all planned functionality:
+All major features are complete and the project is ready for its first stable release:
 
-### ✅ Completed Features
-- **Interactive Features**: Link highlighting, mouse support, keyboard navigation
-- **History & Bookmarks**: Full navigation, persistent storage, bookmark management UI
-- **Tab Support**: Multiple tabs, tab bar, keyboard shortcuts, per-tab state
-- **Downloads**: Binary file detection, progress tracking, queue management
-- **Polish**: Configuration system, themes, search, certificate management
+**Core Features:**
+- ✅ Full Gemini Protocol Support
+- ✅ Interactive TUI with mouse and keyboard navigation
+- ✅ TOFU certificate management
+- ✅ History navigation and bookmarks
+- ✅ Multi-tab browsing
+- ✅ Download support with progress tracking
+- ✅ Search in page functionality
+- ✅ Configuration system with TOML
+
+**Cross-Platform Distribution:**
+- ✅ Pre-built binaries for Linux (x86_64, ARM64), macOS (Intel, Apple Silicon), Windows
+- ✅ AUR package for Arch Linux
+- ✅ Homebrew formula ready (tap setup required)
+- ✅ Chocolatey package ready (submission pending)
+- ✅ GitHub Actions workflow for automated releases
 
 ### 🔮 Future Enhancements
 Potential areas for future development:
@@ -222,17 +285,34 @@ Potential areas for future development:
 
 ```
 starsearch/
-├── cmd/starsearch/       # Main entry point
+├── cmd/starsearch/              # Main entry point
 ├── internal/
-│   ├── app/             # Main application model
-│   ├── gemini/          # Gemini client, parser, TOFU
-│   ├── ui/              # UI components (viewport, addressbar, statusbar, modals)
-│   ├── storage/         # History, bookmarks, config, downloads
-│   └── types/           # Shared types
+│   ├── app/                    # Main application model
+│   ├── gemini/                 # Gemini client, parser, TOFU
+│   ├── ui/                     # UI components (viewport, addressbar, statusbar, modals)
+│   ├── storage/                # History, bookmarks, config, downloads
+│   └── types/                  # Shared types
+├── homebrew/                    # Homebrew formula
+├── chocolatey/                  # Chocolatey package
+├── .github/workflows/           # CI/CD automation
 ├── go.mod
 ├── go.sum
+├── PKGBUILD                     # AUR package definition
+├── DISTRIBUTION.md              # Distribution guide
 └── README.md
 ```
+
+## Distribution
+
+For detailed information about packaging and distribution across platforms, see [DISTRIBUTION.md](DISTRIBUTION.md).
+
+### Package Maintainers
+
+If you'd like to package starsearch for additional platforms or distributions:
+
+1. Pre-built binaries are available in [GitHub Releases](https://github.com/lordbord/starsearch/releases)
+2. See [DISTRIBUTION.md](DISTRIBUTION.md) for checksums and platform-specific notes
+3. Open an issue to let us know about your package!
 
 ## Contributing
 

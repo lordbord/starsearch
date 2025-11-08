@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2015/06/nuspec.xsd">
+  <metadata>
+    <id>starsearch</id>
+    <version>0.1.0</version>
+    <title>Starsearch - Gemini Protocol Browser</title>
+    <authors>lordbord</authors>
+    <owners>lordbord</owners>
+    <licenseUrl>https://github.com/lordbord/starsearch/blob/main/LICENSE</licenseUrl>
+    <projectUrl>https://github.com/lordbord/starsearch</projectUrl>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <description>A modern, feature-rich Gemini protocol browser built with Go and Bubble Tea TUI framework. Browse Geminispace with full mouse and keyboard support, TOFU certificate handling, and a beautiful terminal interface.</description>
+    <summary>A Gemini protocol browser for the terminal</summary>
+    <tags>gemini protocol browser terminal tui cli geminispace</tags>
+    <projectSourceUrl>https://github.com/lordbord/starsearch</projectSourceUrl>
+    <packageSourceUrl>https://github.com/lordbord/starsearch/tree/main/chocolatey</packageSourceUrl>
+    <releaseNotes>https://github.com/lordbord/starsearch/releases/tag/v0.1.0</releaseNotes>
+  </metadata>
+  <files>
+    <file src="tools\**" target="tools" />
+  </files>
+</package>

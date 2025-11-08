@@ -1,0 +1,127 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+
+      - name: Get version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+      - name: Build binaries
+        run: |
+          mkdir -p dist/{linux-amd64,linux-arm64,darwin-amd64,darwin-arm64,windows-amd64}
+          
+          # Build for all platforms with size optimization
+          GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o dist/linux-amd64/starsearch ./cmd/starsearch
+          GOOS=linux GOARCH=arm64 go build -ldflags="-s -w" -o dist/linux-arm64/starsearch ./cmd/starsearch
+          GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w" -o dist/darwin-amd64/starsearch ./cmd/starsearch
+          GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w" -o dist/darwin-arm64/starsearch ./cmd/starsearch
+          GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o dist/windows-amd64/starsearch.exe ./cmd/starsearch
+
+      - name: Create archives
+        run: |
+          cd dist
+          tar czf starsearch-${{ steps.version.outputs.VERSION }}-linux-amd64.tar.gz -C linux-amd64 starsearch
+          tar czf starsearch-${{ steps.version.outputs.VERSION }}-linux-arm64.tar.gz -C linux-arm64 starsearch
+          tar czf starsearch-${{ steps.version.outputs.VERSION }}-darwin-amd64.tar.gz -C darwin-amd64 starsearch
+          tar czf starsearch-${{ steps.version.outputs.VERSION }}-darwin-arm64.tar.gz -C darwin-arm64 starsearch
+          cd windows-amd64 && zip ../starsearch-${{ steps.version.outputs.VERSION }}-windows-amd64.zip starsearch.exe && cd ..
+
+      - name: Generate checksums
+        run: |
+          cd dist
+          sha256sum *.tar.gz *.zip > checksums.txt
+          cat checksums.txt
+
+      - name: Create Release Notes
+        run: |
+          cat > release_notes.md << 'EOF'
+          ## Installation
+
+          ### Linux
+
+          **Arch Linux (AUR)**
+          ```bash
+          yay -S starsearch
+          # or
+          paru -S starsearch
+          ```
+
+          **Other Distributions (Homebrew)**
+          ```bash
+          brew tap lordbord/starsearch
+          brew install starsearch
+          ```
+
+          ### macOS
+
+          ```bash
+          brew tap lordbord/starsearch
+          brew install starsearch
+          ```
+
+          ### Windows
+
+          ```powershell
+          choco install starsearch
+          ```
+
+          ### Manual Installation
+
+          Download the appropriate binary for your platform below, extract it, and place it in your PATH.
+
+          ## Checksums (SHA256)
+
+          ```
+          $(cat dist/checksums.txt)
+          ```
+
+          ## What's New
+
+          Initial release of starsearch - A modern, feature-rich Gemini protocol browser for the terminal.
+
+          ### Features
+
+          - Full Gemini Protocol Support
+          - Mouse & Keyboard Support
+          - TOFU Security (Trust On First Use)
+          - Beautiful TUI with syntax highlighting
+          - History Navigation & Bookmarks
+          - Tab Support
+          - Download Support
+          - Search in Page
+          - Configuration System
+          - Certificate Manager
+
+          For full documentation, visit: https://github.com/lordbord/starsearch
+          EOF
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/*.tar.gz
+            dist/*.zip
+            dist/checksums.txt
+          body_path: release_notes.md
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

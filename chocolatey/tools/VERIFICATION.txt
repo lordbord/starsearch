@@ -1,0 +1,20 @@
+VERIFICATION
+Verification is intended to assist the Chocolatey moderators and community
+in verifying that this package's contents are trustworthy.
+
+Package can be verified like this:
+
+1. Download the following binary from GitHub releases:
+   
+   https://github.com/lordbord/starsearch/releases/download/v0.1.0/starsearch-0.1.0-windows-amd64.zip
+
+2. Get the checksum using Powershell:
+   
+   Get-FileHash starsearch-0.1.0-windows-amd64.zip -Algorithm SHA256
+
+3. The checksum should be:
+   
+   5a9fdb7c26ae8ba8652f9688a33bacad5f0faf9da71679a4327bdb6caf0e17c2
+
+File 'LICENSE' is obtained from:
+   https://github.com/lordbord/starsearch/blob/main/LICENSE

@@ -6,6 +6,9 @@
 *.so
 *.dylib
 
+# Distribution builds
+/dist/
+
 # Test binary
 *.test
 
