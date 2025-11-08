@@ -52,10 +52,11 @@ type Model struct {
 	pendingInputURL string // URL that triggered input request
 	quitting       bool
 	isNavigating   bool   // Whether currently navigating (to avoid adding to history during back/forward)
+	initialURL     string // Initial URL to navigate to on startup
 }
 
 // NewModel creates a new application model
-func NewModel() (*Model, error) {
+func NewModel(initialURL string) (*Model, error) {
 	// Get config directory
 	configDir, err := os.UserConfigDir()
 	if err != nil {
@@ -104,7 +105,7 @@ func NewModel() (*Model, error) {
 	// Create initial tab
 	tabBar.AddTab("", "New Tab")
 
-	return &Model{
+	model := &Model{
 		client:         client,
 		gopherClient:   gopherClient,
 		tofuStore:      tofuStore,
@@ -121,11 +122,18 @@ func NewModel() (*Model, error) {
 		searchModal:    searchModal,
 		width:          80,
 		height:         24,
-	}, nil
+		initialURL:     initialURL,
+	}
+
+	return model, nil
 }
 
 // Init initializes the application
 func (m *Model) Init() tea.Cmd {
+	// If an initial URL was provided, navigate to it
+	if m.initialURL != "" {
+		return m.navigate(m.initialURL)
+	}
 	return nil
 }
 

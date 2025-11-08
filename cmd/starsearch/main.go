@@ -10,8 +10,14 @@ import (
 )
 
 func main() {
+	// Get initial URL from command-line arguments if provided
+	var initialURL string
+	if len(os.Args) > 1 {
+		initialURL = os.Args[1]
+	}
+
 	// Create the application model
-	model, err := app.NewModel()
+	model, err := app.NewModel(initialURL)
 	if err != nil {
 		log.Fatal(err)
 	}
