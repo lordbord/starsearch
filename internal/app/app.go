@@ -29,12 +29,15 @@ type Model struct {
 	tofuStore      *gemini.TOFUStore
 	history        *storage.History
 	bookmarks      *storage.Bookmarks
+	config         *storage.Config
 	addressBar     *ui.AddressBar
 	viewport       *ui.ContentViewport
 	statusBar      *ui.StatusBar
+	tabBar         *ui.TabBar
 	helpModal      *ui.HelpModal
 	inputModal     *ui.InputModal
 	bookmarksModal *ui.BookmarksModal
+	searchModal    *ui.SearchModal
 	width          int
 	height         int
 	currentURL     string
@@ -44,6 +47,7 @@ type Model struct {
 	showHelp       bool   // Whether to show the help modal
 	showInput      bool   // Whether to show the input modal
 	showBookmarks  bool   // Whether to show the bookmarks modal
+	showSearch     bool   // Whether to show the search modal
 	pendingInputURL string // URL that triggered input request
 	quitting       bool
 	isNavigating   bool   // Whether currently navigating (to avoid adding to history during back/forward)
@@ -61,6 +65,7 @@ func NewModel() (*Model, error) {
 	tofuPath := filepath.Join(starsearchDir, "known_hosts.json")
 	historyPath := filepath.Join(starsearchDir, "history.json")
 	bookmarksPath := filepath.Join(starsearchDir, "bookmarks.json")
+	configPath := filepath.Join(starsearchDir, "config.toml")
 
 	// Create TOFU store
 	tofuStore, err := gemini.NewTOFUStore(tofuPath)
@@ -80,17 +85,23 @@ func NewModel() (*Model, error) {
 	client := gemini.NewClient(tofuStore)
 	gopherClient := gopher.NewClient()
 
-	// Create history and bookmarks
-	history := storage.NewHistory(historyPath, 1000)
+	// Create config, history and bookmarks
+	config := storage.NewConfig(configPath)
+	history := storage.NewHistory(historyPath, config.Get().General.MaxHistory)
 	bookmarks := storage.NewBookmarks(bookmarksPath)
 
 	// Create UI components
 	addressBar := ui.NewAddressBar()
 	viewport := ui.NewContentViewport(80, 20)
 	statusBar := ui.NewStatusBar(80)
+	tabBar := ui.NewTabBar()
 	helpModal := ui.NewHelpModal()
 	inputModal := ui.NewInputModal()
 	bookmarksModal := ui.NewBookmarksModal()
+	searchModal := ui.NewSearchModal()
+
+	// Create initial tab
+	tabBar.AddTab("", "New Tab")
 
 	return &Model{
 		client:         client,
@@ -98,12 +109,15 @@ func NewModel() (*Model, error) {
 		tofuStore:      tofuStore,
 		history:        history,
 		bookmarks:      bookmarks,
+		config:         config,
 		addressBar:     addressBar,
 		viewport:       viewport,
 		statusBar:      statusBar,
+		tabBar:         tabBar,
 		helpModal:      helpModal,
 		inputModal:     inputModal,
 		bookmarksModal: bookmarksModal,
+		searchModal:    searchModal,
 		width:          80,
 		height:         24,
 	}, nil
@@ -134,6 +148,20 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Batch(cmds...)
 		}
 
+		// If search modal is showing, handle it
+		if m.showSearch {
+			var cmd tea.Cmd
+			m.searchModal, cmd = m.searchModal.Update(msg)
+			if cmd != nil {
+				cmds = append(cmds, cmd)
+			}
+			// Check if modal was closed
+			if !m.searchModal.IsVisible() {
+				m.showSearch = false
+			}
+			return m, tea.Batch(cmds...)
+		}
+
 		// If input modal is showing, handle it first
 		if m.showInput {
 			var cmd tea.Cmd
@@ -146,6 +174,30 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		// Global key handlers
 		switch msg.String() {
+		case "ctrl+t":
+			// New tab
+			if !m.addressBar.IsFocused() && !m.linkNumbers {
+				m.saveCurrentTabState()
+				m.tabBar.AddTab("", "New Tab")
+				m.loadTabState()
+				return m, nil
+			}
+
+		case "ctrl+w":
+			// Close current tab
+			if !m.addressBar.IsFocused() && !m.linkNumbers {
+				if len(m.tabBar.GetTabs()) > 1 {
+					currentIdx := m.tabBar.GetActiveIndex()
+					m.tabBar.CloseTab(currentIdx)
+					m.loadTabState()
+				} else {
+					// Last tab - quit application
+					m.quitting = true
+					return m, tea.Quit
+				}
+				return m, nil
+			}
+
 		case "ctrl+c", "q":
 			if m.showHelp {
 				m.showHelp = false
@@ -190,8 +242,27 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 
-		case "0", "1", "2", "3", "4", "5", "6", "7", "8", "9":
+		case "1", "2", "3", "4", "5", "6", "7", "8", "9":
 			// Handle link number input
+			if m.linkNumbers {
+				m.linkInput += msg.String()
+				m.statusBar.SetMessage("Enter link number: " + m.linkInput)
+				return m, nil
+			}
+			// Tab switching (1-9)
+			if !m.addressBar.IsFocused() && !m.linkNumbers {
+				num, _ := strconv.Atoi(msg.String())
+				tabIdx := num - 1
+				if tabIdx >= 0 && tabIdx < len(m.tabBar.GetTabs()) {
+					m.saveCurrentTabState()
+					m.tabBar.SwitchTab(tabIdx)
+					m.loadTabState()
+				}
+				return m, nil
+			}
+
+		case "0":
+			// Handle link number input only
 			if m.linkNumbers {
 				m.linkInput += msg.String()
 				m.statusBar.SetMessage("Enter link number: " + m.linkInput)
@@ -307,6 +378,13 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 
+		case "ctrl+f":
+			// Open search modal
+			if !m.addressBar.IsFocused() && !m.linkNumbers && m.currentDoc != nil {
+				m.showSearch = true
+				return m, m.searchModal.Show(m.currentDoc)
+			}
+
 		case "b":
 			// Toggle bookmarks modal
 			if !m.addressBar.IsFocused() && !m.linkNumbers {
@@ -316,28 +394,60 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.bookmarksModal.Show(m.bookmarks.GetAll())
 				return m, nil
 			}
+
+		case "ctrl+tab":
+			// Next tab
+			if !m.addressBar.IsFocused() && !m.linkNumbers {
+				tabs := m.tabBar.GetTabs()
+				if len(tabs) > 1 {
+					m.saveCurrentTabState()
+					nextIdx := (m.tabBar.GetActiveIndex() + 1) % len(tabs)
+					m.tabBar.SwitchTab(nextIdx)
+					m.loadTabState()
+				}
+				return m, nil
+			}
+
+		case "ctrl+shift+tab":
+			// Previous tab
+			if !m.addressBar.IsFocused() && !m.linkNumbers {
+				tabs := m.tabBar.GetTabs()
+				if len(tabs) > 1 {
+					m.saveCurrentTabState()
+					prevIdx := m.tabBar.GetActiveIndex() - 1
+					if prevIdx < 0 {
+						prevIdx = len(tabs) - 1
+					}
+					m.tabBar.SwitchTab(prevIdx)
+					m.loadTabState()
+				}
+				return m, nil
+			}
 		}
 
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
 
-		// Update component sizes
-		m.addressBar.SetWidth(m.width)
+		// Update component sizes (subtract 2 to account for terminal edges)
+		m.addressBar.SetWidth(m.width - 2)
 
-		viewportHeight := m.height - 4 // Leave space for address bar and status bar
+		// Calculate viewport height: total - tab bar (1) - address bar (3) - status bar (1)
+		viewportHeight := m.height - 5
 		if viewportHeight < 1 {
 			viewportHeight = 1
 		}
 		m.viewport.SetSize(m.width, viewportHeight)
 
-		// Set viewport Y position (address bar with border takes 3 lines)
-		m.viewport.SetYPosition(3)
+		// Set viewport Y position (tab bar (1) + address bar with border (3) = 4 lines)
+		m.viewport.SetYPosition(4)
 
 		m.statusBar.SetWidth(m.width)
+		m.tabBar.SetSize(m.width, 1)
 		m.helpModal.SetSize(m.width, m.height)
 		m.inputModal.SetSize(m.width, m.height)
 		m.bookmarksModal.SetSize(m.width, m.height)
+		m.searchModal.SetSize(m.width, m.height)
 
 		return m, nil
 
@@ -377,6 +487,34 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
+	case ui.SearchSubmitMsg:
+		// User submitted a search
+		m.viewport.SetSearch(msg.Query, m.searchModal.GetResults(), msg.CaseSensitive)
+		return m, nil
+
+	case ui.SearchNavigateMsg:
+		// User is navigating search results
+		if msg.Direction == "next" || msg.Direction == "prev" {
+			// Navigation is handled by the search modal
+			result := m.searchModal.GetCurrentResult()
+			if result != nil {
+				m.viewport.GoToSearchResult(result)
+			}
+		} else if msg.Direction == "goto" {
+			// Go to selected result
+			result := m.searchModal.GetCurrentResult()
+			if result != nil {
+				m.viewport.GoToSearchResult(result)
+			}
+		}
+		return m, nil
+
+	case ui.SearchCloseMsg:
+		// User closed search modal
+		m.showSearch = false
+		m.viewport.ClearSearch()
+		return m, nil
+
 	case ui.NavigateMsg:
 		// Handle navigation
 		return m, m.navigate(msg.URL)
@@ -387,6 +525,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		if msg.err != nil {
 			m.statusBar.SetError(msg.err.Error())
+			m.saveCurrentTabState()
 			return m, nil
 		}
 
@@ -400,22 +539,25 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 
-			m.currentDoc = doc
-			m.currentURL = msg.resp.URL
-			m.viewport.SetDocument(doc)
-			m.statusBar.SetURL(m.currentURL)
+				m.currentDoc = doc
+				m.currentURL = msg.resp.URL
+				m.viewport.SetDocument(doc)
+				m.statusBar.SetURL(m.currentURL)
 
-			// Get title from URL for Gopher
-			title := msg.resp.URL
-			m.statusBar.SetMessage(fmt.Sprintf("Loaded: %s", title))
+				// Get title from URL for Gopher
+				title := msg.resp.URL
+				m.statusBar.SetMessage(fmt.Sprintf("Loaded: %s", title))
 
-			// Add to history (unless we're navigating back/forward)
-			if !m.isNavigating {
-				m.history.Add(m.currentURL, title)
-			}
-			m.isNavigating = false
+				// Add to history (unless we're navigating back/forward)
+				if !m.isNavigating {
+					m.history.Add(m.currentURL, title)
+				}
+				m.isNavigating = false
 
-			return m, nil
+				// Save tab state
+				m.saveCurrentTabState()
+
+				return m, nil
 		}
 
 		// Handle Gemini protocol (default)
@@ -456,15 +598,18 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.viewport.SetDocument(doc)
 				m.statusBar.SetURL(m.currentURL)
 
-				// Use filename or URL as title
-				title := msg.resp.URL
-				m.statusBar.SetMessage(fmt.Sprintf("Image loaded: %s", mimeType))
+					// Use filename or URL as title
+					title := msg.resp.URL
+					m.statusBar.SetMessage(fmt.Sprintf("Image loaded: %s", mimeType))
 
-				// Add to history
-				if !m.isNavigating {
-					m.history.Add(m.currentURL, title)
-				}
-				m.isNavigating = false
+					// Add to history
+					if !m.isNavigating {
+						m.history.Add(m.currentURL, title)
+					}
+					m.isNavigating = false
+
+					// Save tab state
+					m.saveCurrentTabState()
 			} else {
 				// Parse text document
 				parser := gemini.NewParser(msg.resp.URL)
@@ -479,16 +624,19 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.viewport.SetDocument(doc)
 				m.statusBar.SetURL(m.currentURL)
 
-				// Get title for status
-				title := gemini.GetTitle(doc)
-				m.statusBar.SetMessage(fmt.Sprintf("Loaded: %s", title))
+					// Get title for status
+					title := gemini.GetTitle(doc)
+					m.statusBar.SetMessage(fmt.Sprintf("Loaded: %s", title))
 
-				// Add to history (unless we're navigating back/forward)
-				if !m.isNavigating {
-					m.history.Add(m.currentURL, title)
+					// Add to history (unless we're navigating back/forward)
+					if !m.isNavigating {
+						m.history.Add(m.currentURL, title)
+					}
+					m.isNavigating = false
+
+					// Save tab state
+					m.saveCurrentTabState()
 				}
-				m.isNavigating = false
-			}
 
 		} else if gemini.IsRedirectStatus(msg.resp.Status) {
 			// Handle redirect
@@ -541,18 +689,61 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Batch(cmds...)
 		}
 
-		// Check if click is on address bar (first 3 lines)
-		if msg.Type == tea.MouseLeft && msg.Y <= 2 && !m.addressBar.IsFocused() {
-			// Focus address bar, same as Ctrl+L
-			if m.linkNumbers {
-				m.linkNumbers = false
-				m.linkInput = ""
-				m.statusBar.SetMessage("Ready")
-				// Viewport moves back up when help text disappears
-				m.viewport.SetYPosition(3)
+		// If search modal is showing, handle mouse events there
+		if m.showSearch {
+			var cmd tea.Cmd
+			m.searchModal, cmd = m.searchModal.Update(msg)
+			if cmd != nil {
+				cmds = append(cmds, cmd)
 			}
-			m.addressBar.SetValue(m.currentURL)
-			return m, m.addressBar.Focus()
+			// Check if modal was closed
+			if !m.searchModal.IsVisible() {
+				m.showSearch = false
+			}
+			return m, tea.Batch(cmds...)
+		}
+
+		if msg.Action == tea.MouseActionPress && msg.Button == tea.MouseButtonLeft {
+			// Check if click is on tab bar (line 0)
+			if msg.Y == 0 {
+				// Pass to tab bar for handling
+				var cmd tea.Cmd
+				m.tabBar, cmd = m.tabBar.Update(msg)
+				if cmd != nil {
+					// Check if this is a tab switch message
+					if switchMsg, ok := cmd().(ui.TabSwitchMsg); ok {
+						// Save current tab state and load new tab state
+						m.saveCurrentTabState()
+						m.tabBar.SwitchTab(switchMsg.Index)
+						m.loadTabState()
+					}
+				}
+				return m, nil
+			}
+
+			// Check if click is on address bar (lines 1-3)
+			if msg.Y >= 1 && msg.Y <= 3 {
+				if !m.addressBar.IsFocused() {
+					// Focus address bar, same as Ctrl+L
+					if m.linkNumbers {
+						m.linkNumbers = false
+						m.linkInput = ""
+						m.statusBar.SetMessage("Ready")
+						// Viewport moves back up when help text disappears
+						m.viewport.SetYPosition(4)
+					}
+					m.addressBar.SetValue(m.currentURL)
+					return m, m.addressBar.Focus()
+				}
+				// If already focused, keep it focused (allow text selection)
+				return m, nil
+			}
+
+			// Click anywhere else - blur address bar if focused
+			if m.addressBar.IsFocused() {
+				m.addressBar.Blur()
+				return m, nil
+			}
 		}
 
 		// Pass mouse events to viewport
@@ -589,6 +780,11 @@ func (m *Model) View() string {
 		return m.bookmarksModal.View()
 	}
 
+	// Show search modal if active
+	if m.showSearch {
+		return m.searchModal.View()
+	}
+
 	// Show input modal if active
 	if m.showInput {
 		return m.inputModal.View()
@@ -601,6 +797,7 @@ func (m *Model) View() string {
 
 	// Layout components vertically
 	components := []string{
+		m.tabBar.View(),
 		m.addressBar.View(),
 		m.viewport.View(),
 		m.statusBar.View(),
@@ -701,4 +898,35 @@ type fetchCompleteMsg struct {
 	resp     *types.Response
 	err      error
 	protocol string // "gemini" or "gopher"
+}
+
+// saveCurrentTabState saves the current browsing state to the active tab
+func (m *Model) saveCurrentTabState() {
+	tab := m.tabBar.GetActiveTab()
+	if tab != nil {
+		tab.URL = m.currentURL
+		tab.Document = m.currentDoc
+		tab.Scroll = m.viewport.GetScrollOffset()
+		if m.currentDoc != nil {
+			tab.Title = gemini.GetTitle(m.currentDoc)
+		} else if m.currentURL != "" {
+			tab.Title = m.currentURL
+		}
+		m.tabBar.UpdateTab(tab.ID, tab.URL, tab.Title, tab.Document)
+	}
+}
+
+// loadTabState loads the state from the active tab
+func (m *Model) loadTabState() {
+	tab := m.tabBar.GetActiveTab()
+	if tab != nil {
+		m.currentURL = tab.URL
+		m.currentDoc = tab.Document
+		if tab.Document != nil {
+			m.viewport.SetDocument(tab.Document)
+			m.viewport.SetScrollOffset(tab.Scroll)
+		}
+		m.statusBar.SetURL(m.currentURL)
+		m.addressBar.SetValue(m.currentURL)
+	}
 }

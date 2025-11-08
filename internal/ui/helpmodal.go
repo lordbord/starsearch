@@ -92,12 +92,28 @@ func (h *HelpModal) View() string {
 	content.WriteString(keyStyle.Render("PgUp") + descStyle.Render("Page up"))
 	content.WriteString("\n\n")
 
+	// Tabs
+	content.WriteString(headerStyle.Render("Tabs"))
+	content.WriteString("\n")
+	content.WriteString(keyStyle.Render("Ctrl+T") + descStyle.Render("New tab"))
+	content.WriteString("\n")
+	content.WriteString(keyStyle.Render("Ctrl+W") + descStyle.Render("Close tab"))
+	content.WriteString("\n")
+	content.WriteString(keyStyle.Render("Ctrl+Tab") + descStyle.Render("Next tab"))
+	content.WriteString("\n")
+	content.WriteString(keyStyle.Render("Ctrl+Shift+Tab") + descStyle.Render("Previous tab"))
+	content.WriteString("\n")
+	content.WriteString(keyStyle.Render("1-9") + descStyle.Render("Switch to tab by number"))
+	content.WriteString("\n\n")
+
 	// Other commands
 	content.WriteString(headerStyle.Render("Other"))
 	content.WriteString("\n")
 	content.WriteString(keyStyle.Render("D") + descStyle.Render("Toggle bookmark"))
 	content.WriteString("\n")
 	content.WriteString(keyStyle.Render("B") + descStyle.Render("View bookmarks"))
+	content.WriteString("\n")
+	content.WriteString(keyStyle.Render("Ctrl+F") + descStyle.Render("Search in page"))
 	content.WriteString("\n")
 	content.WriteString(keyStyle.Render("?") + descStyle.Render("Show this help"))
 	content.WriteString("\n")

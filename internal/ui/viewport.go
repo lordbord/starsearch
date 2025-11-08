@@ -2,6 +2,7 @@ package ui
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/viewport"
@@ -12,13 +13,25 @@ import (
 
 // ContentViewport displays Gemini document content
 type ContentViewport struct {
-	viewport     viewport.Model
-	document     *types.Document
-	width        int
-	height       int
-	yPosition    int // Y position of viewport in the screen layout
-	selectedLink int // Currently selected link for keyboard navigation
-	lineMapping  map[int]int // Maps rendered line number to document line index
+	viewport       viewport.Model
+	document       *types.Document
+	width          int
+	height         int
+	yPosition      int // Y position of viewport in screen layout
+	selectedLink   int // Currently selected link for keyboard navigation
+	lineMapping    map[int]int // Maps rendered line number to document line index
+	linkBounds     map[int][]linkBound // Maps rendered line to clickable link regions
+	searchResults  []types.SearchResult
+	currentSearch  string
+	searchHighlight bool
+	caseSensitive  bool
+}
+
+// linkBound represents the clickable region of a link on a rendered line
+type linkBound struct {
+	startX int
+	endX   int
+	url    string
 }
 
 // NewContentViewport creates a new content viewport
@@ -27,10 +40,13 @@ func NewContentViewport(width, height int) *ContentViewport {
 	vp.MouseWheelEnabled = true
 
 	return &ContentViewport{
-		viewport:     vp,
-		width:        width,
-		height:       height,
-		selectedLink: -1,
+		viewport:       vp,
+		width:          width,
+		height:         height,
+		selectedLink:   -1,
+		searchResults:  []types.SearchResult{},
+		searchHighlight: false,
+		caseSensitive:  false,
 	}
 }
 
@@ -54,12 +70,12 @@ func (c *ContentViewport) Update(msg tea.Msg) (*ContentViewport, tea.Cmd) {
 				// Calculate the rendered line number (accounting for scroll offset)
 				renderedLineNum := c.viewport.YOffset + viewportY
 
-				// Use line mapping to find the corresponding document line index
-				if docLineIdx, ok := c.lineMapping[renderedLineNum]; ok {
-					if docLineIdx >= 0 && docLineIdx < len(c.document.Lines) {
-						line := c.document.Lines[docLineIdx]
-						if line.Type == types.LineLink && line.URL != "" {
-							return c, func() tea.Msg { return NavigateMsg{URL: line.URL} }
+				// Check if there are link bounds for this rendered line
+				if bounds, ok := c.linkBounds[renderedLineNum]; ok {
+					// Check if click X position is within any link bound
+					for _, bound := range bounds {
+						if msg.X >= bound.startX && msg.X < bound.endX {
+							return c, func() tea.Msg { return NavigateMsg{URL: bound.url} }
 						}
 					}
 				}
@@ -80,6 +96,9 @@ func (c *ContentViewport) View() string {
 func (c *ContentViewport) SetDocument(doc *types.Document) {
 	c.document = doc
 	c.selectedLink = -1
+	c.searchResults = []types.SearchResult{}
+	c.currentSearch = ""
+	c.searchHighlight = false
 	c.viewport.YOffset = 0 // Reset scroll to top
 
 	// Render the document
@@ -101,6 +120,50 @@ func (c *ContentViewport) SetSize(width, height int) {
 	}
 }
 
+// SetSearch sets search results and highlights them
+func (c *ContentViewport) SetSearch(query string, results []types.SearchResult, caseSensitive bool) {
+	c.currentSearch = query
+	c.searchResults = results
+	c.searchHighlight = len(results) > 0
+	c.caseSensitive = caseSensitive
+
+	// Re-render document with highlights
+	content := c.renderDocument()
+	c.viewport.SetContent(content)
+}
+
+// ClearSearch clears search highlighting
+func (c *ContentViewport) ClearSearch() {
+	c.currentSearch = ""
+	c.searchResults = []types.SearchResult{}
+	c.searchHighlight = false
+
+	// Re-render document without highlights
+	content := c.renderDocument()
+	c.viewport.SetContent(content)
+}
+
+// GoToSearchResult navigates to a specific search result
+func (c *ContentViewport) GoToSearchResult(result *types.SearchResult) {
+	if result == nil || c.document == nil {
+		return
+	}
+
+	// Find rendered line number for this document line
+	targetLine := -1
+	for renderedLine, docLine := range c.lineMapping {
+		if docLine == result.Line {
+			targetLine = renderedLine
+			break
+		}
+	}
+
+	if targetLine >= 0 {
+		// Scroll to make line visible
+		c.viewport.YOffset = targetLine
+	}
+}
+
 // SetYPosition sets the viewport's Y position in the screen layout
 func (c *ContentViewport) SetYPosition(y int) {
 	c.yPosition = y
@@ -114,6 +177,7 @@ func (c *ContentViewport) renderDocument() string {
 
 	var builder strings.Builder
 	c.lineMapping = make(map[int]int) // Initialize line mapping
+	c.linkBounds = make(map[int][]linkBound) // Initialize link bounds
 	renderedLineNum := 0 // Track which rendered line we're on
 
 	// Helper function to add content and track line mapping
@@ -194,9 +258,27 @@ func (c *ContentViewport) renderDocument() string {
 				linkText = line.URL
 			}
 
+			// Apply search highlighting if enabled
+			if c.searchHighlight && c.currentSearch != "" {
+				linkText = c.highlightSearchText(linkText, i)
+			}
+
 			// Add link number for keyboard navigation
 			numStr := linkNumStyle.Render(fmt.Sprintf("[%d]", line.LinkNum))
 			linkStr := linkStyle.Render(linkText)
+
+			// Calculate clickable bounds for this link
+			// The link starts after the number and space: "[N] "
+			numStrPlain := fmt.Sprintf("[%d] ", line.LinkNum)
+			startX := len(numStrPlain)
+			// Use plain text length (without ANSI codes) for the link
+			// Note: lipgloss adds ANSI codes but they don't affect visual width
+			endX := startX + len(stripANSI(linkText))
+
+			// Store the link bounds for this rendered line
+			c.linkBounds[renderedLineNum] = []linkBound{
+				{startX: startX, endX: endX, url: line.URL},
+			}
 
 			addLine(numStr + " " + linkStr, i)
 
@@ -225,7 +307,12 @@ func (c *ContentViewport) renderDocument() string {
 			if len(line.Text) == 0 {
 				addLine("", i)
 			} else {
-				wrapped := wordWrap(line.Text, c.width)
+				text := line.Text
+				// Apply search highlighting if enabled
+				if c.searchHighlight && c.currentSearch != "" {
+					text = c.highlightSearchText(text, i)
+				}
+				wrapped := wordWrap(text, c.width)
 				// wordWrap may produce multiple lines
 				addMultilineContent(wrapped, i)
 			}
@@ -233,6 +320,78 @@ func (c *ContentViewport) renderDocument() string {
 	}
 
 	return builder.String()
+}
+
+// highlightSearchText applies highlighting to search matches in text
+func (c *ContentViewport) highlightSearchText(text string, lineIdx int) string {
+	if !c.searchHighlight || c.currentSearch == "" {
+		return text
+	}
+
+	// Find all search results for this line
+	var lineResults []types.SearchResult
+	for _, result := range c.searchResults {
+		if result.Line == lineIdx {
+			lineResults = append(lineResults, result)
+		}
+	}
+
+	if len(lineResults) == 0 {
+		return text
+	}
+
+	// Sort results by start position
+	for i := 0; i < len(lineResults)-1; i++ {
+		for j := i + 1; j < len(lineResults); j++ {
+			if lineResults[i].Start > lineResults[j].Start {
+				lineResults[i], lineResults[j] = lineResults[j], lineResults[i]
+			}
+		}
+	}
+
+	// Apply highlighting
+	result := ""
+	lastEnd := 0
+	
+	searchHighlightStyle := lipgloss.NewStyle().
+		Background(lipgloss.Color("11")).
+		Bold(true)
+
+	searchCurrentStyle := lipgloss.NewStyle().
+		Background(lipgloss.Color("3")).
+		Bold(true)
+
+	for _, searchResult := range lineResults {
+		// Add text before match
+		result += text[lastEnd:searchResult.Start]
+		
+		// Add highlighted match
+		matchText := text[searchResult.Start:searchResult.End]
+		
+		// Check if this is the current match
+		isCurrent := false
+		for _, currentResult := range c.searchResults {
+			if currentResult.Line == lineIdx && 
+			   currentResult.Start == searchResult.Start && 
+			   currentResult.End == searchResult.End {
+				isCurrent = true
+				break
+			}
+		}
+		
+		if isCurrent {
+			result += searchCurrentStyle.Render(matchText)
+		} else {
+			result += searchHighlightStyle.Render(matchText)
+		}
+		
+		lastEnd = searchResult.End
+	}
+	
+	// Add remaining text
+	result += text[lastEnd:]
+	
+	return result
 }
 
 // wordWrap wraps text to a specified width
@@ -345,4 +504,21 @@ func (c *ContentViewport) SelectLinkByNumber(num int) tea.Cmd {
 
 	// Number not found
 	return nil
+}
+
+// GetScrollOffset returns the current scroll offset
+func (c *ContentViewport) GetScrollOffset() int {
+	return c.viewport.YOffset
+}
+
+// SetScrollOffset sets the scroll offset
+func (c *ContentViewport) SetScrollOffset(offset int) {
+	c.viewport.YOffset = offset
+}
+
+// stripANSI removes ANSI escape codes from a string
+func stripANSI(str string) string {
+	// Regex to match ANSI escape sequences
+	ansiRegex := regexp.MustCompile(`\x1b\[[0-9;]*[a-zA-Z]`)
+	return ansiRegex.ReplaceAllString(str, "")
 }

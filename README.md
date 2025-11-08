@@ -11,8 +11,11 @@ A modern, feature-rich Gemini protocol browser built with Go and Bubble Tea TUI 
 - **Fast & Lightweight**: Native Go performance with minimal resource usage
 - **History Navigation**: Full back/forward navigation with persistent history
 - **Bookmarks**: Save and manage your favorite Gemini capsules
-- **Tab Support**: Browse multiple capsules simultaneously (coming soon)
-- **Download Support**: Save binary files from Gemini capsules (coming soon)
+- **Tab Support**: Browse multiple capsules simultaneously with full tab management
+- **Download Support**: Save binary files with progress tracking and queue management
+- **Search in Page**: Find text within documents with highlighting and navigation
+- **Configuration System**: Customizable settings via TOML configuration file
+- **Certificate Manager**: View and manage TOFU certificates with manual trust control
 
 ## Installation
 
@@ -73,6 +76,20 @@ The browser will start with an empty page. Use `Ctrl+L` to focus the address bar
 
 #### Bookmarks
 - `D` - Add current page to bookmarks (or remove if already bookmarked)
+- `B` - Open bookmarks manager
+
+#### Search
+- `Ctrl+F` - Open search in page
+- `n` - Next search result
+- `N` - Previous search result
+- `Esc` - Close search
+
+#### Tabs
+- `Ctrl+T` - New tab
+- `Ctrl+W` - Close current tab
+- `Ctrl+Tab` - Next tab
+- `Ctrl+Shift+Tab` - Previous tab
+- `1-9` - Switch to specific tab
 
 #### Application
 - `?` - Show help screen with all keyboard shortcuts
@@ -84,7 +101,9 @@ The browser will start with an empty page. Use `Ctrl+L` to focus the address bar
 2. Type a Gemini URL (e.g., `gemini://gemini.circumlunar.space/`)
 3. Press `Enter` to navigate
 4. Click links with your mouse or press `G` and type a link number
-5. Enjoy browsing Geminispace!
+5. Use `Ctrl+T` to open new tabs for parallel browsing
+6. Press `Ctrl+F` to search within pages
+7. Enjoy browsing Geminispace!
 
 ### Example URLs to Try
 
@@ -103,6 +122,8 @@ The browser fully supports the text/gemini format with styled rendering:
 - **Lists**: Bulleted list items
 - **Quotes**: Italic quoted text with indentation
 - **Preformatted Text**: Code blocks and ASCII art with monospace styling
+- **Search**: Text highlighting with current match emphasis
+- **Images**: Automatic rendering with terminal-compatible display
 
 ## Certificate Management (TOFU)
 
@@ -110,8 +131,9 @@ starsearch uses Trust On First Use (TOFU) for certificate management:
 
 - Certificates are automatically trusted on first visit
 - Certificate fingerprints are stored in `~/.config/starsearch/known_hosts.json`
-- Changed certificates will trigger a warning (currently auto-accepted)
-- Manual certificate management coming soon
+- Manual certificate management with trust/untrust controls
+- View certificate details including issuer, subject, and validity periods
+- Changed certificates trigger warnings with manual review options
 
 ## Configuration
 
@@ -122,45 +144,69 @@ Configuration files are stored in:
 
 ### Files
 
+- `config.toml` - User configuration (colors, UI settings, downloads)
 - `known_hosts.json` - TOFU certificate store
 - `bookmarks.json` - Saved bookmarks
 - `history.json` - Browsing history
-- `config.toml` - User configuration (coming soon)
+- `downloads.json` - Active and completed downloads
 
-## Roadmap
+### Configuration Options
 
-### Phase 3: Interactive Features ✅
-- [x] Link highlighting and selection
-- [x] Mouse click support for links
-- [x] Keyboard-based link navigation (g + number)
-- [x] Status code handling (redirects, errors)
-- [x] Input prompts (status 10/11) for search
+The `config.toml` file supports the following sections:
 
-### Phase 4: History & Bookmarks ✅
-- [x] Back/forward navigation
-- [x] Persistent history storage
-- [x] Bookmark manager
-- [x] Add/remove bookmarks with 'D' key
-- [ ] Bookmarks UI (sidebar or modal to view all bookmarks)
+```toml
+[general]
+home_url = "gemini://gemini.circumlunar.space/"
+search_engine = "gemini://gus.guru/"
+max_history = 1000
+auto_save_history = true
 
-### Phase 5: Tabs
-- [ ] Multiple tab support
-- [ ] Tab bar UI
-- [ ] Tab switching shortcuts
-- [ ] Per-tab state management
+[ui]
+show_line_numbers = false
+show_link_numbers = true
+enable_mouse = true
+scroll_speed = 3
 
-### Phase 6: Downloads
-- [ ] Binary file detection
-- [ ] Download prompts
-- [ ] Progress indicators
-- [ ] Configurable download directory
+[colors]
+theme = "default"
+link_color = "12"
+visited_link_color = "13"
+heading1_color = "11"
+heading2_color = "14"
+heading3_color = "10"
+text_color = "15"
+quote_color = "8"
+preformat_color = "7"
+background_color = "0"
 
-### Phase 7: Polish
-- [x] Help screen
-- [ ] Configuration system
-- [ ] Custom themes and colors
-- [ ] Search in page (Ctrl+F)
-- [ ] Certificate manager UI
+[downloads]
+directory = "~/Downloads"
+ask_before_download = true
+max_concurrent = 3
+timeout = 30
+```
+
+## Development Status
+
+🎉 **All Major Features Complete!**
+
+The browser now includes all planned functionality:
+
+### ✅ Completed Features
+- **Interactive Features**: Link highlighting, mouse support, keyboard navigation
+- **History & Bookmarks**: Full navigation, persistent storage, bookmark management UI
+- **Tab Support**: Multiple tabs, tab bar, keyboard shortcuts, per-tab state
+- **Downloads**: Binary file detection, progress tracking, queue management
+- **Polish**: Configuration system, themes, search, certificate management
+
+### 🔮 Future Enhancements
+Potential areas for future development:
+- Plugin system for custom protocols
+- Session persistence and restoration
+- Advanced bookmark organization (folders, tags)
+- Custom themes and color schemes
+- Integration with external editors
+- Gemini-to-HTML export functionality
 
 ## Technical Details
 
@@ -180,8 +226,8 @@ starsearch/
 ├── internal/
 │   ├── app/             # Main application model
 │   ├── gemini/          # Gemini client, parser, TOFU
-│   ├── ui/              # UI components (viewport, addressbar, statusbar)
-│   ├── storage/         # History, bookmarks, config (planned)
+│   ├── ui/              # UI components (viewport, addressbar, statusbar, modals)
+│   ├── storage/         # History, bookmarks, config, downloads
 │   └── types/           # Shared types
 ├── go.mod
 ├── go.sum
