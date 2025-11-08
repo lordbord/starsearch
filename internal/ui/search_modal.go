@@ -13,20 +13,20 @@ import (
 
 // SearchModal displays a search interface for finding text in documents
 type SearchModal struct {
-	visible      bool
-	input        textinput.Model
-	results      []types.SearchResult
-	selectedIdx  int
-	currentMatch int
-	width        int
-	height       int
-	document     *types.Document
+	visible       bool
+	input         textinput.Model
+	results       []types.SearchResult
+	selectedIdx   int
+	currentMatch  int
+	width         int
+	height        int
+	document      *types.Document
 	caseSensitive bool
 }
 
 // SearchSubmitMsg is sent when a search is submitted
 type SearchSubmitMsg struct {
-	Query string
+	Query         string
 	CaseSensitive bool
 }
 
@@ -104,7 +104,7 @@ func (m *SearchModal) Update(msg tea.Msg) (*SearchModal, tea.Cmd) {
 					m.currentMatch = 0
 					return m, func() tea.Msg {
 						return SearchSubmitMsg{
-							Query: query,
+							Query:         query,
 							CaseSensitive: m.caseSensitive,
 						}
 					}
@@ -164,7 +164,7 @@ func (m *SearchModal) Update(msg tea.Msg) (*SearchModal, tea.Cmd) {
 
 func (m *SearchModal) performSearch(query string) {
 	m.results = []types.SearchResult{}
-	
+
 	if m.document == nil {
 		return
 	}
@@ -312,7 +312,7 @@ func (m *SearchModal) View() string {
 
 		for i := startIdx; i < endIdx; i++ {
 			result := m.results[i]
-			
+
 			// Get line text with context
 			lineText := ""
 			if result.Line < len(m.document.Lines) {
@@ -324,7 +324,7 @@ func (m *SearchModal) View() string {
 			}
 
 			matchText := fmt.Sprintf("Line %d: %s", result.Line+1, lineText)
-			
+
 			prefix := "  "
 			if i == m.selectedIdx {
 				prefix = "▶ "

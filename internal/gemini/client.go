@@ -13,10 +13,10 @@ import (
 
 // Client wraps the go-gemini client with additional functionality
 type Client struct {
-	client     *gemini.Client
-	tofuStore  *TOFUStore
-	userAgent  string
-	timeout    time.Duration
+	client    *gemini.Client
+	tofuStore *TOFUStore
+	userAgent string
+	timeout   time.Duration
 }
 
 // NewClient creates a new Gemini client with TOFU support
@@ -176,13 +176,13 @@ func GetMIMEType(resp *types.Response) string {
 // IsTextGemini checks if the response is text/gemini
 func IsTextGemini(mimeType string) bool {
 	return mimeType == "text/gemini" ||
-	       mimeType == "text/gemini; charset=utf-8" ||
-	       mimeType == "text/gemini;charset=utf-8"
+		mimeType == "text/gemini; charset=utf-8" ||
+		mimeType == "text/gemini;charset=utf-8"
 }
 
 // IsTextPlain checks if the response is plain text
 func IsTextPlain(mimeType string) bool {
 	return mimeType == "text/plain" ||
-	       mimeType == "text/plain; charset=utf-8" ||
-	       mimeType == "text/plain;charset=utf-8"
+		mimeType == "text/plain; charset=utf-8" ||
+		mimeType == "text/plain;charset=utf-8"
 }

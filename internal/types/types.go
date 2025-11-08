@@ -70,9 +70,9 @@ type HistoryEntry struct {
 
 // Config represents the application configuration
 type Config struct {
-	General GeneralConfig `toml:"general"`
-	UI      UIConfig      `toml:"ui"`
-	Colors  ColorConfig   `toml:"colors"`
+	General   GeneralConfig  `toml:"general"`
+	UI        UIConfig       `toml:"ui"`
+	Colors    ColorConfig    `toml:"colors"`
 	Downloads DownloadConfig `toml:"downloads"`
 }
 
@@ -94,24 +94,24 @@ type UIConfig struct {
 
 // ColorConfig contains color theme settings
 type ColorConfig struct {
-	Theme           string `toml:"theme"`
-	LinkColor       string `toml:"link_color"`
+	Theme            string `toml:"theme"`
+	LinkColor        string `toml:"link_color"`
 	VisitedLinkColor string `toml:"visited_link_color"`
-	Heading1Color   string `toml:"heading1_color"`
-	Heading2Color   string `toml:"heading2_color"`
-	Heading3Color   string `toml:"heading3_color"`
-	TextColor       string `toml:"text_color"`
-	QuoteColor      string `toml:"quote_color"`
-	PreformatColor  string `toml:"preformat_color"`
-	BackgroundColor string `toml:"background_color"`
+	Heading1Color    string `toml:"heading1_color"`
+	Heading2Color    string `toml:"heading2_color"`
+	Heading3Color    string `toml:"heading3_color"`
+	TextColor        string `toml:"text_color"`
+	QuoteColor       string `toml:"quote_color"`
+	PreformatColor   string `toml:"preformat_color"`
+	BackgroundColor  string `toml:"background_color"`
 }
 
 // DownloadConfig contains download settings
 type DownloadConfig struct {
-	Directory       string `toml:"directory"`
-	AskBeforeDownload bool `toml:"ask_before_download"`
-	MaxConcurrent   int    `toml:"max_concurrent"`
-	Timeout         int    `toml:"timeout"`
+	Directory         string `toml:"directory"`
+	AskBeforeDownload bool   `toml:"ask_before_download"`
+	MaxConcurrent     int    `toml:"max_concurrent"`
+	Timeout           int    `toml:"timeout"`
 }
 
 // DownloadStatus represents the status of a download
@@ -127,15 +127,15 @@ const (
 
 // Download represents a file download
 type Download struct {
-	ID          string         `json:"id"`
-	URL         string         `json:"url"`
-	Filename    string         `json:"filename"`
-	Size        int64          `json:"size"`
-	Downloaded  int64          `json:"downloaded"`
-	Status      DownloadStatus `json:"status"`
-	Error       string         `json:"error"`
-	StartTime   int64          `json:"start_time"`
-	FinishTime  int64          `json:"finish_time"`
+	ID         string         `json:"id"`
+	URL        string         `json:"url"`
+	Filename   string         `json:"filename"`
+	Size       int64          `json:"size"`
+	Downloaded int64          `json:"downloaded"`
+	Status     DownloadStatus `json:"status"`
+	Error      string         `json:"error"`
+	StartTime  int64          `json:"start_time"`
+	FinishTime int64          `json:"finish_time"`
 }
 
 // SearchResult represents a search match in a document
@@ -149,13 +149,13 @@ type SearchResult struct {
 
 // CertificateInfo represents certificate information for display
 type CertificateInfo struct {
-	Host         string    `json:"host"`
-	Fingerprint  string    `json:"fingerprint"`
-	NotBefore    time.Time `json:"not_before"`
-	NotAfter     time.Time `json:"not_after"`
-	Issuer       string    `json:"issuer"`
-	Subject      string    `json:"subject"`
-	Trusted      bool      `json:"trusted"`
-	FirstSeen    time.Time `json:"first_seen"`
-	LastSeen     time.Time `json:"last_seen"`
+	Host        string    `json:"host"`
+	Fingerprint string    `json:"fingerprint"`
+	NotBefore   time.Time `json:"not_before"`
+	NotAfter    time.Time `json:"not_after"`
+	Issuer      string    `json:"issuer"`
+	Subject     string    `json:"subject"`
+	Trusted     bool      `json:"trusted"`
+	FirstSeen   time.Time `json:"first_seen"`
+	LastSeen    time.Time `json:"last_seen"`
 }

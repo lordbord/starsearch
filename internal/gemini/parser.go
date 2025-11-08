@@ -164,8 +164,8 @@ func (p *Parser) parseLine(rawLine string, inPreformat *bool, linkNum *int) type
 func GetTitle(doc *types.Document) string {
 	for _, line := range doc.Lines {
 		if line.Type == types.LineHeading1 ||
-		   line.Type == types.LineHeading2 ||
-		   line.Type == types.LineHeading3 {
+			line.Type == types.LineHeading2 ||
+			line.Type == types.LineHeading3 {
 			if line.Text != "" {
 				return line.Text
 			}

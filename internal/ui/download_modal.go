@@ -30,7 +30,7 @@ type DownloadStartMsg struct {
 
 // DownloadProgressMsg is sent when download progress updates
 type DownloadProgressMsg struct {
-	ID        string
+	ID         string
 	Downloaded int64
 }
 
@@ -57,8 +57,8 @@ func NewDownloadModal() *DownloadModal {
 	return &DownloadModal{
 		visible:      false,
 		downloads:    []types.Download{},
-		selectedIdx:   0,
-		scrollOffset:  0,
+		selectedIdx:  0,
+		scrollOffset: 0,
 		progress:     prog,
 	}
 }
@@ -299,7 +299,7 @@ func (m *DownloadModal) View() string {
 			}
 
 			// Format file info
-			fileInfo := fmt.Sprintf("%s (%s/%s)", 
+			fileInfo := fmt.Sprintf("%s (%s/%s)",
 				download.Filename,
 				m.formatBytes(download.Downloaded),
 				m.formatBytes(download.Size))
@@ -312,7 +312,7 @@ func (m *DownloadModal) View() string {
 				if elapsed > 0 {
 					speed := float64(download.Downloaded) / float64(elapsed)
 					speedText = fmt.Sprintf(" @ %s/s", m.formatBytes(int64(speed)))
-					
+
 					if download.Size > 0 && download.Downloaded > 0 {
 						remaining := download.Size - download.Downloaded
 						eta := int64(float64(remaining) / speed)

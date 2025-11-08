@@ -13,18 +13,18 @@ import (
 
 // ContentViewport displays Gemini document content
 type ContentViewport struct {
-	viewport       viewport.Model
-	document       *types.Document
-	width          int
-	height         int
-	yPosition      int // Y position of viewport in screen layout
-	selectedLink   int // Currently selected link for keyboard navigation
-	lineMapping    map[int]int // Maps rendered line number to document line index
-	linkBounds     map[int][]linkBound // Maps rendered line to clickable link regions
-	searchResults  []types.SearchResult
-	currentSearch  string
+	viewport        viewport.Model
+	document        *types.Document
+	width           int
+	height          int
+	yPosition       int                 // Y position of viewport in screen layout
+	selectedLink    int                 // Currently selected link for keyboard navigation
+	lineMapping     map[int]int         // Maps rendered line number to document line index
+	linkBounds      map[int][]linkBound // Maps rendered line to clickable link regions
+	searchResults   []types.SearchResult
+	currentSearch   string
 	searchHighlight bool
-	caseSensitive  bool
+	caseSensitive   bool
 }
 
 // linkBound represents the clickable region of a link on a rendered line
@@ -40,13 +40,13 @@ func NewContentViewport(width, height int) *ContentViewport {
 	vp.MouseWheelEnabled = true
 
 	return &ContentViewport{
-		viewport:       vp,
-		width:          width,
-		height:         height,
-		selectedLink:   -1,
-		searchResults:  []types.SearchResult{},
+		viewport:        vp,
+		width:           width,
+		height:          height,
+		selectedLink:    -1,
+		searchResults:   []types.SearchResult{},
 		searchHighlight: false,
-		caseSensitive:  false,
+		caseSensitive:   false,
 	}
 }
 
@@ -176,9 +176,9 @@ func (c *ContentViewport) renderDocument() string {
 	}
 
 	var builder strings.Builder
-	c.lineMapping = make(map[int]int) // Initialize line mapping
+	c.lineMapping = make(map[int]int)        // Initialize line mapping
 	c.linkBounds = make(map[int][]linkBound) // Initialize link bounds
-	renderedLineNum := 0 // Track which rendered line we're on
+	renderedLineNum := 0                     // Track which rendered line we're on
 
 	// Helper function to add content and track line mapping
 	addLine := func(content string, docLineIdx int) {
@@ -414,7 +414,7 @@ func (c *ContentViewport) highlightSearchText(text string, lineIdx int) string {
 	// Apply highlighting
 	result := ""
 	lastEnd := 0
-	
+
 	searchHighlightStyle := lipgloss.NewStyle().
 		Background(lipgloss.Color("11")).
 		Bold(true)
@@ -426,33 +426,33 @@ func (c *ContentViewport) highlightSearchText(text string, lineIdx int) string {
 	for _, searchResult := range lineResults {
 		// Add text before match
 		result += text[lastEnd:searchResult.Start]
-		
+
 		// Add highlighted match
 		matchText := text[searchResult.Start:searchResult.End]
-		
+
 		// Check if this is the current match
 		isCurrent := false
 		for _, currentResult := range c.searchResults {
-			if currentResult.Line == lineIdx && 
-			   currentResult.Start == searchResult.Start && 
-			   currentResult.End == searchResult.End {
+			if currentResult.Line == lineIdx &&
+				currentResult.Start == searchResult.Start &&
+				currentResult.End == searchResult.End {
 				isCurrent = true
 				break
 			}
 		}
-		
+
 		if isCurrent {
 			result += searchCurrentStyle.Render(matchText)
 		} else {
 			result += searchHighlightStyle.Render(matchText)
 		}
-		
+
 		lastEnd = searchResult.End
 	}
-	
+
 	// Add remaining text
 	result += text[lastEnd:]
-	
+
 	return result
 }
 

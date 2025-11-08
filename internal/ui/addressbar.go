@@ -8,9 +8,9 @@ import (
 
 // AddressBar represents the URL input bar
 type AddressBar struct {
-	input    textinput.Model
-	focused  bool
-	width    int
+	input   textinput.Model
+	focused bool
+	width   int
 }
 
 // NewAddressBar creates a new address bar

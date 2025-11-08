@@ -12,10 +12,10 @@ import (
 
 // TabBar displays and manages browser tabs
 type TabBar struct {
-	tabs        []types.Tab
-	activeIdx   int
-	width       int
-	height      int
+	tabs         []types.Tab
+	activeIdx    int
+	width        int
+	height       int
 	scrollOffset int
 }
 
@@ -34,8 +34,8 @@ type TabNewMsg struct{}
 
 func NewTabBar() *TabBar {
 	return &TabBar{
-		tabs:        []types.Tab{},
-		activeIdx:   0,
+		tabs:         []types.Tab{},
+		activeIdx:    0,
 		scrollOffset: 0,
 	}
 }
@@ -45,7 +45,7 @@ func (t *TabBar) AddTab(url, title string) {
 		ID:       len(t.tabs),
 		Title:    title,
 		URL:      url,
-		Document:  nil,
+		Document: nil,
 		Scroll:   0,
 	}
 
@@ -133,7 +133,7 @@ func (t *TabBar) adjustScroll() {
 		activeTabWidth := t.calculateTabWidth(t.tabs[t.activeIdx])
 
 		// Scroll right if active tab is beyond visible area
-		if activeTabX + activeTabWidth > t.scrollOffset + t.width {
+		if activeTabX+activeTabWidth > t.scrollOffset+t.width {
 			t.scrollOffset = activeTabX + activeTabWidth - t.width + 2
 		}
 
@@ -155,7 +155,7 @@ func (t *TabBar) calculateTabWidth(tab types.Tab) int {
 	if title == "" {
 		title = "Untitled"
 	}
-	
+
 	// Add icon and padding
 	width := len(title) + 4 // 2 for icon, 2 for padding
 

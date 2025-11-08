@@ -43,16 +43,16 @@ func getDefaultConfig() *types.Config {
 			ScrollSpeed:     3,
 		},
 		Colors: types.ColorConfig{
-			Theme:             "default",
-			LinkColor:         "12",  // Blue
-			VisitedLinkColor:  "13",  // Magenta
-			Heading1Color:     "11",  // Yellow
-			Heading2Color:     "14",  // Cyan
-			Heading3Color:     "10",  // Green
-			TextColor:         "15",  // White
-			QuoteColor:        "8",   // Gray
-			PreformatColor:    "7",   // Silver
-			BackgroundColor:   "0",   // Black
+			Theme:            "default",
+			LinkColor:        "12", // Blue
+			VisitedLinkColor: "13", // Magenta
+			Heading1Color:    "11", // Yellow
+			Heading2Color:    "14", // Cyan
+			Heading3Color:    "10", // Green
+			TextColor:        "15", // White
+			QuoteColor:       "8",  // Gray
+			PreformatColor:   "7",  // Silver
+			BackgroundColor:  "0",  // Black
 		},
 		Downloads: types.DownloadConfig{
 			Directory:         "~/Downloads",

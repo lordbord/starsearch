@@ -25,33 +25,33 @@ import (
 
 // Model is the main application model
 type Model struct {
-	client         *gemini.Client
-	gopherClient   *gopher.Client
-	tofuStore      *gemini.TOFUStore
-	history        *storage.History
-	bookmarks      *storage.Bookmarks
-	config         *storage.Config
-	addressBar     *ui.AddressBar
-	viewport       *ui.ContentViewport
-	statusBar      *ui.StatusBar
-	tabBar         *ui.TabBar
-	helpModal      *ui.HelpModal
-	inputModal     *ui.InputModal
-	bookmarksModal *ui.BookmarksModal
-	searchModal    *ui.SearchModal
-	width          int
-	height         int
-	currentURL     string
-	currentDoc     *types.Document
-	linkNumbers    bool   // Whether we're in link number input mode
-	linkInput      string
-	showHelp       bool   // Whether to show the help modal
-	showInput      bool   // Whether to show the input modal
-	showBookmarks  bool   // Whether to show the bookmarks modal
-	showSearch     bool   // Whether to show the search modal
+	client          *gemini.Client
+	gopherClient    *gopher.Client
+	tofuStore       *gemini.TOFUStore
+	history         *storage.History
+	bookmarks       *storage.Bookmarks
+	config          *storage.Config
+	addressBar      *ui.AddressBar
+	viewport        *ui.ContentViewport
+	statusBar       *ui.StatusBar
+	tabBar          *ui.TabBar
+	helpModal       *ui.HelpModal
+	inputModal      *ui.InputModal
+	bookmarksModal  *ui.BookmarksModal
+	searchModal     *ui.SearchModal
+	width           int
+	height          int
+	currentURL      string
+	currentDoc      *types.Document
+	linkNumbers     bool // Whether we're in link number input mode
+	linkInput       string
+	showHelp        bool   // Whether to show the help modal
+	showInput       bool   // Whether to show the input modal
+	showBookmarks   bool   // Whether to show the bookmarks modal
+	showSearch      bool   // Whether to show the search modal
 	pendingInputURL string // URL that triggered input request
-	quitting       bool
-	isNavigating   bool   // Whether currently navigating (to avoid adding to history during back/forward)
+	quitting        bool
+	isNavigating    bool // Whether currently navigating (to avoid adding to history during back/forward)
 }
 
 // NewModel creates a new application model
@@ -546,25 +546,25 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 
-				m.currentDoc = doc
-				m.currentURL = msg.resp.URL
-				m.viewport.SetDocument(doc)
-				m.statusBar.SetURL(m.currentURL)
+			m.currentDoc = doc
+			m.currentURL = msg.resp.URL
+			m.viewport.SetDocument(doc)
+			m.statusBar.SetURL(m.currentURL)
 
-				// Get title from URL for Gopher
-				title := msg.resp.URL
-				m.statusBar.SetMessage(fmt.Sprintf("Loaded: %s", title))
+			// Get title from URL for Gopher
+			title := msg.resp.URL
+			m.statusBar.SetMessage(fmt.Sprintf("Loaded: %s", title))
 
-				// Add to history (unless we're navigating back/forward)
-				if !m.isNavigating {
-					m.history.Add(m.currentURL, title)
-				}
-				m.isNavigating = false
+			// Add to history (unless we're navigating back/forward)
+			if !m.isNavigating {
+				m.history.Add(m.currentURL, title)
+			}
+			m.isNavigating = false
 
-				// Save tab state
-				m.saveCurrentTabState()
+			// Save tab state
+			m.saveCurrentTabState()
 
-				return m, nil
+			return m, nil
 		}
 
 		// Handle Gemini protocol (default)
@@ -605,18 +605,18 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.viewport.SetDocument(doc)
 				m.statusBar.SetURL(m.currentURL)
 
-					// Use filename or URL as title
-					title := msg.resp.URL
-					m.statusBar.SetMessage(fmt.Sprintf("Image loaded: %s", mimeType))
+				// Use filename or URL as title
+				title := msg.resp.URL
+				m.statusBar.SetMessage(fmt.Sprintf("Image loaded: %s", mimeType))
 
-					// Add to history
-					if !m.isNavigating {
-						m.history.Add(m.currentURL, title)
-					}
-					m.isNavigating = false
+				// Add to history
+				if !m.isNavigating {
+					m.history.Add(m.currentURL, title)
+				}
+				m.isNavigating = false
 
-					// Save tab state
-					m.saveCurrentTabState()
+				// Save tab state
+				m.saveCurrentTabState()
 			} else {
 				// Parse text document
 				parser := gemini.NewParser(msg.resp.URL)
@@ -631,19 +631,19 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.viewport.SetDocument(doc)
 				m.statusBar.SetURL(m.currentURL)
 
-					// Get title for status
-					title := gemini.GetTitle(doc)
-					m.statusBar.SetMessage(fmt.Sprintf("Loaded: %s", title))
+				// Get title for status
+				title := gemini.GetTitle(doc)
+				m.statusBar.SetMessage(fmt.Sprintf("Loaded: %s", title))
 
-					// Add to history (unless we're navigating back/forward)
-					if !m.isNavigating {
-						m.history.Add(m.currentURL, title)
-					}
-					m.isNavigating = false
-
-					// Save tab state
-					m.saveCurrentTabState()
+				// Add to history (unless we're navigating back/forward)
+				if !m.isNavigating {
+					m.history.Add(m.currentURL, title)
 				}
+				m.isNavigating = false
+
+				// Save tab state
+				m.saveCurrentTabState()
+			}
 
 		} else if gemini.IsRedirectStatus(msg.resp.Status) {
 			// Handle redirect

@@ -15,9 +15,9 @@ import (
 
 // Downloads manages active and completed downloads
 type Downloads struct {
-	downloads  map[string]*types.Download
-	storePath  string
-	mutex      sync.RWMutex
+	downloads     map[string]*types.Download
+	storePath     string
+	mutex         sync.RWMutex
 	maxConcurrent int
 }
 
@@ -28,8 +28,8 @@ func NewDownloads(storePath string, maxConcurrent int) *Downloads {
 	}
 
 	d := &Downloads{
-		downloads:    make(map[string]*types.Download),
-		storePath:    storePath,
+		downloads:     make(map[string]*types.Download),
+		storePath:     storePath,
 		maxConcurrent: maxConcurrent,
 	}
 
@@ -64,13 +64,13 @@ func (d *Downloads) Add(url, filename string, size int64) (*types.Download, erro
 
 	// Create download
 	download := &types.Download{
-		ID:        id,
-		URL:       url,
-		Filename:  filename,
-		Size:      size,
+		ID:         id,
+		URL:        url,
+		Filename:   filename,
+		Size:       size,
 		Downloaded: 0,
-		Status:    types.DownloadPending,
-		StartTime: time.Now().Unix(),
+		Status:     types.DownloadPending,
+		StartTime:  time.Now().Unix(),
 	}
 
 	d.downloads[id] = download

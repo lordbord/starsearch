@@ -30,10 +30,10 @@ type CertificateInfo struct {
 
 // TOFUStore manages trusted certificates using Trust On First Use
 type TOFUStore struct {
-	mu          sync.RWMutex
-	certs       map[string]*CertificateInfo // hostname -> cert info
-	storePath   string
-	OnNewCert   func(host string, cert *x509.Certificate) bool // Callback for new certs
+	mu           sync.RWMutex
+	certs        map[string]*CertificateInfo // hostname -> cert info
+	storePath    string
+	OnNewCert    func(host string, cert *x509.Certificate) bool     // Callback for new certs
 	OnCertChange func(host string, old, new *x509.Certificate) bool // Callback for changed certs
 }
 
@@ -212,7 +212,7 @@ func FormatFingerprint(fingerprint string) string {
 		if i > 0 {
 			result += ":"
 		}
-		result += fingerprint[i:i+2]
+		result += fingerprint[i : i+2]
 	}
 	return result
 }

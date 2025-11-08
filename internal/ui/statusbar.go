@@ -8,12 +8,12 @@ import (
 
 // StatusBar displays status information at the bottom
 type StatusBar struct {
-	message      string
-	url          string
+	message       string
+	url           string
 	scrollPercent float64
-	width        int
-	isLoading    bool
-	errorMsg     string
+	width         int
+	isLoading     bool
+	errorMsg      string
 }
 
 // NewStatusBar creates a new status bar

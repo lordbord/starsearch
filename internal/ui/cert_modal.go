@@ -38,8 +38,8 @@ func NewCertificateModal() *CertificateModal {
 	return &CertificateModal{
 		visible:      false,
 		certificates: []types.CertificateInfo{},
-		selectedIdx:   0,
-		scrollOffset:  0,
+		selectedIdx:  0,
+		scrollOffset: 0,
 	}
 }
 
