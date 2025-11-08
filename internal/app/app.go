@@ -223,7 +223,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.linkInput = ""
 				m.statusBar.SetMessage("Enter link number: ")
 				// Viewport moves down by 1 line due to help text
-				m.viewport.SetYPosition(4)
+				m.viewport.SetYPosition(5)
 				return m, nil
 			}
 
@@ -239,7 +239,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.linkInput = ""
 				m.statusBar.SetMessage("Ready")
 				// Viewport moves back up when help text disappears
-				m.viewport.SetYPosition(3)
+				m.viewport.SetYPosition(4)
 				return m, nil
 			}
 
@@ -279,14 +279,14 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.linkInput = ""
 					m.statusBar.SetMessage("Ready")
 					// Viewport moves back up when help text disappears
-					m.viewport.SetYPosition(3)
+					m.viewport.SetYPosition(4)
 					return m, m.viewport.SelectLinkByNumber(num)
 				}
 				m.linkNumbers = false
 				m.linkInput = ""
 				m.statusBar.SetMessage("Invalid link number")
 				// Viewport moves back up when help text disappears
-				m.viewport.SetYPosition(3)
+				m.viewport.SetYPosition(4)
 				return m, nil
 			}
 
@@ -447,7 +447,12 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.viewport.SetSize(m.width, viewportHeight)
 
 		// Set viewport Y position (tab bar (1) + address bar with border (3) = 4 lines)
-		m.viewport.SetYPosition(4)
+		// Or 5 lines if in link number mode (help text is shown above tab bar)
+		if m.linkNumbers {
+			m.viewport.SetYPosition(5)
+		} else {
+			m.viewport.SetYPosition(4)
+		}
 
 		m.statusBar.SetWidth(m.width)
 		m.tabBar.SetSize(m.width, 1)
