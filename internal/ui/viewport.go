@@ -239,17 +239,23 @@ func (c *ContentViewport) renderDocument() string {
 	for i, line := range c.document.Lines {
 		switch line.Type {
 		case types.LineHeading1:
-			rendered := heading1Style.Render("# " + line.Text)
+			// Wrap heading text before styling
+			wrapped := wordWrap("# "+line.Text, c.width)
+			rendered := heading1Style.Render(wrapped)
 			// Styles with margins produce multiple lines
 			addMultilineContent(rendered, i)
 
 		case types.LineHeading2:
-			rendered := heading2Style.Render("## " + line.Text)
+			// Wrap heading text before styling
+			wrapped := wordWrap("## "+line.Text, c.width)
+			rendered := heading2Style.Render(wrapped)
 			// Styles with margins produce multiple lines
 			addMultilineContent(rendered, i)
 
 		case types.LineHeading3:
-			rendered := heading3Style.Render("### " + line.Text)
+			// Wrap heading text before styling
+			wrapped := wordWrap("### "+line.Text, c.width)
+			rendered := heading3Style.Render(wrapped)
 			addMultilineContent(rendered, i)
 
 		case types.LineLink:
@@ -264,40 +270,96 @@ func (c *ContentViewport) renderDocument() string {
 			}
 
 			// Add link number for keyboard navigation
-			numStr := linkNumStyle.Render(fmt.Sprintf("[%d]", line.LinkNum))
-			linkStr := linkStyle.Render(linkText)
-
-			// Calculate clickable bounds for this link
-			// The link starts after the number and space: "[N] "
 			numStrPlain := fmt.Sprintf("[%d] ", line.LinkNum)
-			startX := len(numStrPlain)
-			// Use plain text length (without ANSI codes) for the link
-			// Note: lipgloss adds ANSI codes but they don't affect visual width
-			endX := startX + len(stripANSI(linkText))
+			linkPrefix := len(numStrPlain)
 
-			// Store the link bounds for this rendered line
-			c.linkBounds[renderedLineNum] = []linkBound{
-				{startX: startX, endX: endX, url: line.URL},
+			// Wrap link text to fit viewport width (accounting for the link number prefix)
+			availableWidth := c.width - linkPrefix
+			if availableWidth < 20 {
+				availableWidth = 20 // Minimum width for readability
 			}
+			wrappedLink := wordWrap(linkText, availableWidth)
+			wrappedLines := strings.Split(wrappedLink, "\n")
 
-			addLine(numStr + " " + linkStr, i)
+			// Render each wrapped line
+			for lineIdx, wrappedLine := range wrappedLines {
+				var displayLine string
+				if lineIdx == 0 {
+					// First line includes the link number
+					numStr := linkNumStyle.Render(fmt.Sprintf("[%d]", line.LinkNum))
+					linkStr := linkStyle.Render(wrappedLine)
+					displayLine = numStr + " " + linkStr
+
+					// Calculate clickable bounds for first line
+					startX := linkPrefix
+					endX := startX + len(stripANSI(wrappedLine))
+					c.linkBounds[renderedLineNum] = []linkBound{
+						{startX: startX, endX: endX, url: line.URL},
+					}
+				} else {
+					// Continuation lines are indented to align with first line
+					indent := strings.Repeat(" ", linkPrefix)
+					linkStr := linkStyle.Render(wrappedLine)
+					displayLine = indent + linkStr
+
+					// Calculate clickable bounds for continuation line
+					startX := linkPrefix
+					endX := startX + len(stripANSI(wrappedLine))
+					c.linkBounds[renderedLineNum] = []linkBound{
+						{startX: startX, endX: endX, url: line.URL},
+					}
+				}
+
+				addLine(displayLine, i)
+			}
+			// Skip the default addLine call since we handled it above
+			continue
 
 		case types.LineList:
-			addLine(listStyle.Render("  • " + line.Text), i)
+			// Wrap list text (accounting for bullet point)
+			listPrefix := "  • "
+			availableWidth := c.width - len(listPrefix)
+			if availableWidth < 20 {
+				availableWidth = 20
+			}
+			wrapped := wordWrap(line.Text, availableWidth)
+			wrappedLines := strings.Split(wrapped, "\n")
+
+			for lineIdx, wrappedLine := range wrappedLines {
+				if lineIdx == 0 {
+					// First line with bullet
+					addLine(listStyle.Render(listPrefix+wrappedLine), i)
+				} else {
+					// Continuation lines indented
+					indent := strings.Repeat(" ", len(listPrefix))
+					addLine(listStyle.Render(indent+wrappedLine), i)
+				}
+			}
+			continue
 
 		case types.LineQuote:
-			rendered := quoteStyle.Render(line.Text)
+			// Wrap quote text (accounting for padding)
+			quotePadding := 2 // PaddingLeft(2) from quoteStyle
+			availableWidth := c.width - quotePadding
+			if availableWidth < 20 {
+				availableWidth = 20
+			}
+			wrapped := wordWrap(line.Text, availableWidth)
+			rendered := quoteStyle.Render(wrapped)
 			addMultilineContent(rendered, i)
 
 		case types.LinePreformatStart:
-			// Optionally show alt text
+			// Optionally show alt text, hard-wrap if needed
 			if line.Text != "" {
-				addLine(preformatStyle.Render("``` " + line.Text), i)
+				wrapped := hardWrap("``` "+line.Text, c.width)
+				addMultilineContent(preformatStyle.Render(wrapped), i)
 			}
 			// Note: If text is empty, we don't render anything but the mapping continues
 
 		case types.LinePreformatText:
-			addLine(preformatStyle.Render(line.Text), i)
+			// Hard-wrap preformatted text to prevent overflow
+			wrapped := hardWrap(line.Text, c.width)
+			addMultilineContent(preformatStyle.Render(wrapped), i)
 
 		case types.LinePreformatEnd:
 			addLine(preformatStyle.Render("```"), i)
@@ -421,6 +483,28 @@ func wordWrap(text string, width int) string {
 
 	if len(currentLine) > 0 {
 		lines = append(lines, currentLine)
+	}
+
+	return strings.Join(lines, "\n")
+}
+
+// hardWrap wraps text by breaking at exact width (for preformatted text)
+func hardWrap(text string, width int) string {
+	if width <= 0 {
+		width = 80
+	}
+
+	if len(text) <= width {
+		return text
+	}
+
+	var lines []string
+	for len(text) > width {
+		lines = append(lines, text[:width])
+		text = text[width:]
+	}
+	if len(text) > 0 {
+		lines = append(lines, text)
 	}
 
 	return strings.Join(lines, "\n")

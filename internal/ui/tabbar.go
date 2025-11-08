@@ -100,11 +100,12 @@ func (t *TabBar) GetTabs() []types.Tab {
 	return t.tabs
 }
 
-func (t *TabBar) UpdateTab(index int, url, title string, document *types.Document) {
+func (t *TabBar) UpdateTab(index int, url, title string, document *types.Document, scroll int) {
 	if index >= 0 && index < len(t.tabs) {
 		t.tabs[index].URL = url
 		t.tabs[index].Title = title
 		t.tabs[index].Document = document
+		t.tabs[index].Scroll = scroll
 	}
 }
 

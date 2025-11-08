@@ -54,7 +54,35 @@ func (a *AddressBar) Update(msg tea.Msg) (*AddressBar, tea.Cmd) {
 				a.focused = false
 				a.input.Blur()
 				return a, nil
+			case "ctrl+c":
+				// Clear the address bar text
+				a.input.SetValue("")
+				return a, nil
 			}
+		}
+
+	case tea.MouseMsg:
+		if a.focused && msg.Action == tea.MouseActionPress && msg.Button == tea.MouseButtonLeft {
+			// Calculate position within the text input
+			// Border takes 1 char on left, padding takes 1 char = 2 chars offset
+			// The address bar is rendered with border and padding, so adjust coordinates
+			borderOffset := 2 // 1 for border + 1 for padding
+
+			// Create an adjusted mouse message with coordinates relative to the text input
+			adjustedMsg := tea.MouseMsg{
+				X:      msg.X - borderOffset,
+				Y:      0, // Text input is single line
+				Type:   msg.Type,
+				Action: msg.Action,
+				Button: msg.Button,
+			}
+
+			// Only pass through if click is within the input area
+			if adjustedMsg.X >= 0 && adjustedMsg.X < a.input.Width {
+				a.input, cmd = a.input.Update(adjustedMsg)
+			}
+			// Return early to avoid passing the unadjusted message to the input
+			return a, cmd
 		}
 	}
 

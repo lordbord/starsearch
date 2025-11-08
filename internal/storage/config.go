@@ -190,7 +190,7 @@ func (c *Config) GetDownloadDirectory() string {
 	}
 
 	// Expand ~ to home directory
-	if dir[:2] == "~/" {
+	if len(dir) >= 2 && dir[:2] == "~/" {
 		home, err := os.UserHomeDir()
 		if err == nil {
 			return filepath.Join(home, dir[2:])

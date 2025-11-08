@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/atotto/clipboard"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
@@ -385,6 +386,12 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, m.searchModal.Show(m.currentDoc)
 			}
 
+		case "ctrl+y":
+			// Copy page content to clipboard
+			if !m.addressBar.IsFocused() && !m.linkNumbers && m.currentDoc != nil {
+				return m, m.copyPageContent()
+			}
+
 		case "b":
 			// Toggle bookmarks modal
 			if !m.addressBar.IsFocused() && !m.linkNumbers {
@@ -733,10 +740,16 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						m.viewport.SetYPosition(4)
 					}
 					m.addressBar.SetValue(m.currentURL)
-					return m, m.addressBar.Focus()
+					focusCmd := m.addressBar.Focus()
+					cmds = append(cmds, focusCmd)
 				}
-				// If already focused, keep it focused (allow text selection)
-				return m, nil
+				// Pass mouse event to address bar for cursor positioning
+				var cmd tea.Cmd
+				m.addressBar, cmd = m.addressBar.Update(msg)
+				if cmd != nil {
+					cmds = append(cmds, cmd)
+				}
+				return m, tea.Batch(cmds...)
 			}
 
 			// Click anywhere else - blur address bar if focused
@@ -888,6 +901,16 @@ func (m *Model) openExternalURL(urlStr string) tea.Cmd {
 	}
 }
 
+// copyPageContent copies the current page content to the clipboard
+func (m *Model) copyPageContent() tea.Cmd {
+	if m.currentDoc == nil {
+		return nil
+	}
+
+	_ = clipboard.WriteAll(string(m.currentDoc.RawBody))
+	return nil
+}
+
 // externalLinkOpenedMsg is sent when an external link is opened
 type externalLinkOpenedMsg struct {
 	url string
@@ -902,17 +925,18 @@ type fetchCompleteMsg struct {
 
 // saveCurrentTabState saves the current browsing state to the active tab
 func (m *Model) saveCurrentTabState() {
-	tab := m.tabBar.GetActiveTab()
-	if tab != nil {
-		tab.URL = m.currentURL
-		tab.Document = m.currentDoc
-		tab.Scroll = m.viewport.GetScrollOffset()
-		if m.currentDoc != nil {
-			tab.Title = gemini.GetTitle(m.currentDoc)
-		} else if m.currentURL != "" {
-			tab.Title = m.currentURL
+	if m.tabBar.GetActiveTab() != nil {
+		url := m.currentURL
+		doc := m.currentDoc
+		scroll := m.viewport.GetScrollOffset()
+		title := ""
+		if doc != nil {
+			title = gemini.GetTitle(doc)
+		} else if url != "" {
+			title = url
 		}
-		m.tabBar.UpdateTab(tab.ID, tab.URL, tab.Title, tab.Document)
+		idx := m.tabBar.GetActiveIndex()
+		m.tabBar.UpdateTab(idx, url, title, doc, scroll)
 	}
 }
 
@@ -925,6 +949,9 @@ func (m *Model) loadTabState() {
 		if tab.Document != nil {
 			m.viewport.SetDocument(tab.Document)
 			m.viewport.SetScrollOffset(tab.Scroll)
+		} else {
+			// Clear viewport if tab has no document
+			m.viewport.SetDocument(nil)
 		}
 		m.statusBar.SetURL(m.currentURL)
 		m.addressBar.SetValue(m.currentURL)
