@@ -9,7 +9,7 @@ import (
 	"starsearch/internal/app"
 )
 
-const version = "0.1.2"
+const version = "0.1.3"
 
 func main() {
 	// Handle version flag

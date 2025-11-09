@@ -1,6 +1,6 @@
 # Maintainer: lordbord <your-email@example.com>
 pkgname=starsearch
-pkgver=0.1.2
+pkgver=0.1.3
 pkgrel=1
 pkgdesc="A modern, feature-rich Gemini protocol browser built with Go and Bubble Tea TUI framework"
 arch=('x86_64' 'aarch64')
