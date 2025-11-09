@@ -25,6 +25,7 @@ type ContentViewport struct {
 	currentSearch  string
 	searchHighlight bool
 	caseSensitive  bool
+	colors         *types.ColorConfig // Color configuration
 }
 
 // linkBound represents the clickable region of a link on a rendered line
@@ -47,6 +48,7 @@ func NewContentViewport(width, height int) *ContentViewport {
 		searchResults:  []types.SearchResult{},
 		searchHighlight: false,
 		caseSensitive:  false,
+		colors:         nil, // Will be set via SetColors
 	}
 }
 
@@ -114,6 +116,22 @@ func (c *ContentViewport) SetSize(width, height int) {
 	c.viewport.Height = height
 
 	// Re-render document if present
+	if c.document != nil {
+		content := c.renderDocument()
+		c.viewport.SetContent(content)
+	}
+}
+
+// SetColors sets the color configuration for the viewport
+func (c *ContentViewport) SetColors(colors *types.ColorConfig) {
+	if colors != nil {
+		// Create a copy to avoid issues with shared references
+		colorCopy := *colors
+		c.colors = &colorCopy
+	} else {
+		c.colors = nil
+	}
+	// Re-render document if present to apply new colors
 	if c.document != nil {
 		content := c.renderDocument()
 		c.viewport.SetContent(content)
@@ -200,41 +218,74 @@ func (c *ContentViewport) renderDocument() string {
 		}
 	}
 
+	// Get colors from config or use defaults
+	linkColor := "12"
+	heading1Color := "11"
+	heading2Color := "14"
+	heading3Color := "10"
+	quoteColor := "8"
+	preformatColor := "7"
+	backgroundColor := "0"
+	
+	if c.colors != nil {
+		if c.colors.LinkColor != "" {
+			linkColor = c.colors.LinkColor
+		}
+		if c.colors.Heading1Color != "" {
+			heading1Color = c.colors.Heading1Color
+		}
+		if c.colors.Heading2Color != "" {
+			heading2Color = c.colors.Heading2Color
+		}
+		if c.colors.Heading3Color != "" {
+			heading3Color = c.colors.Heading3Color
+		}
+		if c.colors.QuoteColor != "" {
+			quoteColor = c.colors.QuoteColor
+		}
+		if c.colors.PreformatColor != "" {
+			preformatColor = c.colors.PreformatColor
+		}
+		if c.colors.BackgroundColor != "" {
+			backgroundColor = c.colors.BackgroundColor
+		}
+	}
+
 	// Define styles
 	heading1Style := lipgloss.NewStyle().
 		Bold(true).
-		Foreground(lipgloss.Color("12")).
+		Foreground(lipgloss.Color(heading1Color)).
 		MarginTop(1).
 		MarginBottom(1)
 
 	heading2Style := lipgloss.NewStyle().
 		Bold(true).
-		Foreground(lipgloss.Color("14")).
+		Foreground(lipgloss.Color(heading2Color)).
 		MarginTop(1)
 
 	heading3Style := lipgloss.NewStyle().
 		Bold(true).
-		Foreground(lipgloss.Color("10"))
+		Foreground(lipgloss.Color(heading3Color))
 
 	linkStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("12")).
+		Foreground(lipgloss.Color(linkColor)).
 		Underline(true)
 
 	linkNumStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("8")).
+		Foreground(lipgloss.Color(quoteColor)).
 		Bold(true)
 
 	listStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("7"))
+		Foreground(lipgloss.Color(preformatColor))
 
 	quoteStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("8")).
+		Foreground(lipgloss.Color(quoteColor)).
 		Italic(true).
 		PaddingLeft(2)
 
 	preformatStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("11")).
-		Background(lipgloss.Color("235"))
+		Foreground(lipgloss.Color(preformatColor)).
+		Background(lipgloss.Color(backgroundColor))
 
 	for i, line := range c.document.Lines {
 		switch line.Type {

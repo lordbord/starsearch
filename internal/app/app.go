@@ -15,6 +15,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
+	"starsearch/internal/cache"
 	"starsearch/internal/gemini"
 	"starsearch/internal/gopher"
 	"starsearch/internal/renderer"
@@ -31,6 +32,8 @@ type Model struct {
 	history        *storage.History
 	bookmarks      *storage.Bookmarks
 	config         *storage.Config
+	sessionManager *storage.SessionManager
+	pageCache      *cache.Cache
 	addressBar     *ui.AddressBar
 	viewport       *ui.ContentViewport
 	statusBar      *ui.StatusBar
@@ -39,6 +42,7 @@ type Model struct {
 	inputModal     *ui.InputModal
 	bookmarksModal *ui.BookmarksModal
 	searchModal    *ui.SearchModal
+	historyModal   *ui.HistoryModal
 	width          int
 	height         int
 	currentURL     string
@@ -49,10 +53,12 @@ type Model struct {
 	showInput      bool   // Whether to show the input modal
 	showBookmarks  bool   // Whether to show the bookmarks modal
 	showSearch     bool   // Whether to show the search modal
+	showHistory    bool   // Whether to show the history modal
 	pendingInputURL string // URL that triggered input request
 	quitting       bool
 	isNavigating   bool   // Whether currently navigating (to avoid adding to history during back/forward)
 	initialURL     string // Initial URL to navigate to on startup
+	forceReload    bool   // Whether to bypass cache for next navigation
 }
 
 // NewModel creates a new application model
@@ -68,6 +74,7 @@ func NewModel(initialURL string) (*Model, error) {
 	historyPath := filepath.Join(starsearchDir, "history.json")
 	bookmarksPath := filepath.Join(starsearchDir, "bookmarks.json")
 	configPath := filepath.Join(starsearchDir, "config.toml")
+	sessionPath := filepath.Join(starsearchDir, "session.json")
 
 	// Create TOFU store
 	tofuStore, err := gemini.NewTOFUStore(tofuPath)
@@ -87,10 +94,17 @@ func NewModel(initialURL string) (*Model, error) {
 	client := gemini.NewClient(tofuStore)
 	gopherClient := gopher.NewClient()
 
-	// Create config, history and bookmarks
+	// Create config, history, bookmarks, session manager, and cache
 	config := storage.NewConfig(configPath)
 	history := storage.NewHistory(historyPath, config.Get().General.MaxHistory)
 	bookmarks := storage.NewBookmarks(bookmarksPath)
+	sessionManager := storage.NewSessionManager(sessionPath)
+	
+	// Create page cache if enabled
+	var pageCache *cache.Cache
+	if config.Get().Performance.EnableCache {
+		pageCache = cache.NewCache(config.Get().Performance.CacheSizeMB, int64(config.Get().Performance.CacheTTL))
+	}
 
 	// Create UI components
 	addressBar := ui.NewAddressBar()
@@ -101,6 +115,7 @@ func NewModel(initialURL string) (*Model, error) {
 	inputModal := ui.NewInputModal()
 	bookmarksModal := ui.NewBookmarksModal()
 	searchModal := ui.NewSearchModal()
+	historyModal := ui.NewHistoryModal()
 
 	// Create initial tab
 	tabBar.AddTab("", "New Tab")
@@ -112,6 +127,8 @@ func NewModel(initialURL string) (*Model, error) {
 		history:        history,
 		bookmarks:      bookmarks,
 		config:         config,
+		sessionManager: sessionManager,
+		pageCache:      pageCache,
 		addressBar:     addressBar,
 		viewport:       viewport,
 		statusBar:      statusBar,
@@ -120,19 +137,71 @@ func NewModel(initialURL string) (*Model, error) {
 		inputModal:     inputModal,
 		bookmarksModal: bookmarksModal,
 		searchModal:    searchModal,
+		historyModal:   historyModal,
 		width:          80,
 		height:         24,
 		initialURL:     initialURL,
 	}
+
+	// Apply theme colors to viewport
+	colors := config.Get().Colors
+	viewport.SetColors(&colors)
 
 	return model, nil
 }
 
 // Init initializes the application
 func (m *Model) Init() tea.Cmd {
-	// If an initial URL was provided, navigate to it
-	if m.initialURL != "" {
-		return m.navigate(m.initialURL)
+	var cmds []tea.Cmd
+
+	// Restore session if enabled and session exists
+	if m.config.Get().General.RestoreSession {
+		session, err := m.sessionManager.Load()
+		if err == nil && session != nil && len(session.Tabs) > 0 {
+			// Clear initial tab
+			tabs := m.tabBar.GetTabs()
+			if len(tabs) > 0 {
+				m.tabBar.CloseTab(0)
+			}
+
+			// Restore tabs
+			for _, sessionTab := range session.Tabs {
+				m.tabBar.AddTab(sessionTab.URL, sessionTab.Title)
+			}
+
+			// Update scroll positions for restored tabs
+			tabs = m.tabBar.GetTabs()
+			for i, sessionTab := range session.Tabs {
+				if i < len(tabs) {
+					var doc *types.Document
+					if tabs[i].Document != nil {
+						doc = tabs[i].Document
+					}
+					m.tabBar.UpdateTab(i, sessionTab.URL, sessionTab.Title, doc, sessionTab.Scroll)
+				}
+			}
+
+			// Set active tab
+			if session.ActiveIndex >= 0 && session.ActiveIndex < len(session.Tabs) {
+				m.tabBar.SwitchTab(session.ActiveIndex)
+				m.loadTabState()
+
+				// Navigate to active tab's URL if it exists
+				activeTab := m.tabBar.GetActiveTab()
+				if activeTab != nil && activeTab.URL != "" {
+					cmds = append(cmds, m.navigate(activeTab.URL))
+				}
+			}
+		}
+	}
+
+	// If an initial URL was provided and no session was restored, navigate to it
+	if m.initialURL != "" && len(cmds) == 0 {
+		cmds = append(cmds, m.navigate(m.initialURL))
+	}
+
+	if len(cmds) > 0 {
+		return tea.Batch(cmds...)
 	}
 	return nil
 }
@@ -143,6 +212,20 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
+		// If history modal is showing, handle it first
+		if m.showHistory {
+			var cmd tea.Cmd
+			m.historyModal, cmd = m.historyModal.Update(msg)
+			if cmd != nil {
+				cmds = append(cmds, cmd)
+			}
+			// Check if modal was closed
+			if !m.historyModal.IsVisible() {
+				m.showHistory = false
+			}
+			return m, tea.Batch(cmds...)
+		}
+
 		// If bookmarks modal is showing, handle it first
 		if m.showBookmarks {
 			var cmd tea.Cmd
@@ -201,6 +284,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.loadTabState()
 				} else {
 					// Last tab - quit application
+					m.saveSession()
 					m.quitting = true
 					return m, tea.Quit
 				}
@@ -213,6 +297,8 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 			if !m.addressBar.IsFocused() && !m.linkNumbers {
+				// Save session before quitting
+				m.saveSession()
 				m.quitting = true
 				return m, tea.Quit
 			}
@@ -222,6 +308,9 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.linkNumbers = false
 			m.linkInput = ""
 			m.addressBar.SetValue(m.currentURL)
+			// Show initial suggestions
+			suggestions := ui.FilterSuggestions("", m.history.GetAll(), m.bookmarks.GetAll())
+			m.addressBar.UpdateSuggestions(suggestions)
 			return m, m.addressBar.Focus()
 
 		case "g":
@@ -301,6 +390,14 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "r":
 			// Reload current page
 			if !m.addressBar.IsFocused() && !m.linkNumbers && m.currentURL != "" {
+				m.isNavigating = true
+				return m, m.navigate(m.currentURL)
+			}
+
+		case "ctrl+r":
+			// Force reload (bypass cache)
+			if !m.addressBar.IsFocused() && !m.linkNumbers && m.currentURL != "" {
+				m.forceReload = true
 				m.isNavigating = true
 				return m, m.navigate(m.currentURL)
 			}
@@ -400,6 +497,16 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, m.copyPageContent()
 			}
 
+		case "ctrl+h":
+			// Show history modal
+			if !m.addressBar.IsFocused() && !m.linkNumbers {
+				m.showHelp = false
+				m.showHistory = true
+				m.historyModal.Show(m.history.GetAll())
+				m.historyModal.SetSize(m.width, m.height)
+				return m, nil
+			}
+
 		case "b":
 			// Toggle bookmarks modal
 			if !m.addressBar.IsFocused() && !m.linkNumbers {
@@ -440,6 +547,11 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 
+	case tea.QuitMsg:
+		// Window was closed - save session before quitting
+		m.saveSession()
+		return m, nil
+
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
@@ -468,6 +580,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.inputModal.SetSize(m.width, m.height)
 		m.bookmarksModal.SetSize(m.width, m.height)
 		m.searchModal.SetSize(m.width, m.height)
+		m.historyModal.SetSize(m.width, m.height)
 
 		return m, nil
 
@@ -489,6 +602,12 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.pendingInputURL = ""
 		m.statusBar.SetMessage("Input cancelled")
 		return m, nil
+
+	case ui.HistorySelectedMsg:
+		// User selected a history entry to navigate to
+		m.showHistory = false
+		m.statusBar.SetMessage("Navigating to history entry...")
+		return m, m.navigate(msg.URL)
 
 	case ui.BookmarkSelectedMsg:
 		// User selected a bookmark to navigate to
@@ -542,6 +661,11 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case fetchCompleteMsg:
 		// Handle fetch completion
 		m.statusBar.SetLoading(false)
+
+		// Show cache status
+		if msg.fromCache {
+			m.statusBar.SetMessage("Loaded from cache")
+		}
 
 		if msg.err != nil {
 			m.statusBar.SetError(msg.err.Error())
@@ -704,6 +828,20 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case tea.MouseMsg:
+		// If history modal is showing, handle mouse events there
+		if m.showHistory {
+			var cmd tea.Cmd
+			m.historyModal, cmd = m.historyModal.Update(msg)
+			if cmd != nil {
+				cmds = append(cmds, cmd)
+			}
+			// Check if modal was closed
+			if !m.historyModal.IsVisible() {
+				m.showHistory = false
+			}
+			return m, tea.Batch(cmds...)
+		}
+
 		// If bookmarks modal is showing, handle mouse events there
 		if m.showBookmarks {
 			var cmd tea.Cmd
@@ -792,7 +930,18 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// Update address bar
 	if m.addressBar.IsFocused() {
 		var cmd tea.Cmd
+		oldValue := m.addressBar.Value()
 		m.addressBar, cmd = m.addressBar.Update(msg)
+		newValue := m.addressBar.Value()
+		
+		// Update suggestions if value changed
+		if oldValue != newValue && newValue != "" {
+			suggestions := ui.FilterSuggestions(newValue, m.history.GetAll(), m.bookmarks.GetAll())
+			m.addressBar.UpdateSuggestions(suggestions)
+		} else if newValue == "" {
+			m.addressBar.UpdateSuggestions([]ui.Suggestion{})
+		}
+		
 		if cmd != nil {
 			cmds = append(cmds, cmd)
 		}
@@ -810,12 +959,17 @@ func (m *Model) View() string {
 		return "Thanks for using starsearch!\n"
 	}
 
+	// Show history modal if active (highest priority for overlay)
+	if m.showHistory {
+		return m.historyModal.View()
+	}
+
 	// Show bookmarks modal if active (highest priority for overlay)
 	if m.showBookmarks {
 		return m.bookmarksModal.View()
 	}
 
-	// Show search modal if active
+		// Show search modal if active
 	if m.showSearch {
 		return m.searchModal.View()
 	}
@@ -853,6 +1007,20 @@ func (m *Model) View() string {
 
 // navigate fetches and displays a URL
 func (m *Model) navigate(urlStr string) tea.Cmd {
+	// Check cache first if enabled and not forcing reload
+	bypassCache := m.forceReload
+	m.forceReload = false // Reset force reload flag
+
+	if !bypassCache && m.pageCache != nil && m.config.Get().Performance.EnableCache {
+		if cachedResp, found := m.pageCache.Get(urlStr); found {
+			// Serve from cache
+			m.statusBar.SetMessage("Loaded from cache: " + urlStr)
+			return func() tea.Msg {
+				return fetchCompleteMsg{resp: cachedResp, err: nil, protocol: "gemini", fromCache: true}
+			}
+		}
+	}
+
 	// Parse URL to detect protocol
 	parsedURL, err := url.Parse(urlStr)
 	if err == nil && parsedURL.Scheme != "" {
@@ -864,7 +1032,7 @@ func (m *Model) navigate(urlStr string) tea.Cmd {
 
 			return func() tea.Msg {
 				resp, err := m.gopherClient.Fetch(urlStr)
-				return fetchCompleteMsg{resp: resp, err: err, protocol: "gopher"}
+				return fetchCompleteMsg{resp: resp, err: err, protocol: "gopher", fromCache: false}
 			}
 
 		case "gemini":
@@ -886,7 +1054,11 @@ func (m *Model) navigate(urlStr string) tea.Cmd {
 
 	return func() tea.Msg {
 		resp, err := m.client.Fetch(urlStr)
-		return fetchCompleteMsg{resp: resp, err: err, protocol: "gemini"}
+		// Cache successful responses
+		if err == nil && resp != nil && m.pageCache != nil && m.config.Get().Performance.EnableCache {
+			m.pageCache.Set(urlStr, resp, int64(m.config.Get().Performance.CacheTTL))
+		}
+		return fetchCompleteMsg{resp: resp, err: err, protocol: "gemini", fromCache: false}
 	}
 }
 
@@ -940,9 +1112,10 @@ type externalLinkOpenedMsg struct {
 
 // fetchCompleteMsg is sent when a fetch completes
 type fetchCompleteMsg struct {
-	resp     *types.Response
-	err      error
-	protocol string // "gemini" or "gopher"
+	resp      *types.Response
+	err       error
+	protocol  string // "gemini" or "gopher"
+	fromCache bool   // Whether response came from cache
 }
 
 // saveCurrentTabState saves the current browsing state to the active tab
@@ -978,4 +1151,19 @@ func (m *Model) loadTabState() {
 		m.statusBar.SetURL(m.currentURL)
 		m.addressBar.SetValue(m.currentURL)
 	}
+}
+
+// saveSession saves the current session state
+func (m *Model) saveSession() {
+	if !m.config.Get().General.RestoreSession {
+		return
+	}
+
+	// Save current tab state before saving session
+	m.saveCurrentTabState()
+
+	tabs := m.tabBar.GetTabs()
+	activeIndex := m.tabBar.GetActiveIndex()
+
+	_ = m.sessionManager.Save(tabs, activeIndex) // Ignore errors
 }

@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 
 	"github.com/BurntSushi/toml"
+	"starsearch/internal/themes"
 	"starsearch/internal/types"
 )
 
@@ -35,6 +36,7 @@ func getDefaultConfig() *types.Config {
 			SearchEngine:    "gemini://gus.guru/",
 			MaxHistory:      1000,
 			AutoSaveHistory: true,
+			RestoreSession:  true,
 		},
 		UI: types.UIConfig{
 			ShowLineNumbers: false,
@@ -59,6 +61,14 @@ func getDefaultConfig() *types.Config {
 			AskBeforeDownload: true,
 			MaxConcurrent:     3,
 			Timeout:           30,
+		},
+		Performance: types.PerformanceConfig{
+			EnableCache:        true,
+			CacheTTL:           3600,
+			CacheSizeMB:        50,
+			EnablePrefetch:     false,
+			PrefetchIdleDelay:  2,
+			ConnectionPoolSize: 2,
 		},
 	}
 }
@@ -126,6 +136,7 @@ func (c *Config) mergeWithDefaults(loaded *types.Config) *types.Config {
 		defaults.General.MaxHistory = loaded.General.MaxHistory
 	}
 	defaults.General.AutoSaveHistory = loaded.General.AutoSaveHistory
+	defaults.General.RestoreSession = loaded.General.RestoreSession
 
 	// UI settings
 	defaults.UI.ShowLineNumbers = loaded.UI.ShowLineNumbers
@@ -136,9 +147,12 @@ func (c *Config) mergeWithDefaults(loaded *types.Config) *types.Config {
 	}
 
 	// Color settings
-	if loaded.Colors.Theme != "" {
-		defaults.Colors.Theme = loaded.Colors.Theme
+	// Apply theme first if specified
+	if loaded.Colors.Theme != "" && loaded.Colors.Theme != "default" {
+		themes.ApplyTheme(&defaults.Colors, loaded.Colors.Theme)
 	}
+	
+	// Then apply any custom color overrides
 	if loaded.Colors.LinkColor != "" {
 		defaults.Colors.LinkColor = loaded.Colors.LinkColor
 	}

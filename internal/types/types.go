@@ -70,10 +70,11 @@ type HistoryEntry struct {
 
 // Config represents the application configuration
 type Config struct {
-	General GeneralConfig `toml:"general"`
-	UI      UIConfig      `toml:"ui"`
-	Colors  ColorConfig   `toml:"colors"`
-	Downloads DownloadConfig `toml:"downloads"`
+	General     GeneralConfig     `toml:"general"`
+	UI          UIConfig          `toml:"ui"`
+	Colors      ColorConfig       `toml:"colors"`
+	Downloads   DownloadConfig    `toml:"downloads"`
+	Performance PerformanceConfig `toml:"performance"`
 }
 
 // GeneralConfig contains general application settings
@@ -82,6 +83,7 @@ type GeneralConfig struct {
 	SearchEngine    string `toml:"search_engine"`
 	MaxHistory      int    `toml:"max_history"`
 	AutoSaveHistory bool   `toml:"auto_save_history"`
+	RestoreSession  bool   `toml:"restore_session"`
 }
 
 // UIConfig contains user interface settings
@@ -112,6 +114,16 @@ type DownloadConfig struct {
 	AskBeforeDownload bool `toml:"ask_before_download"`
 	MaxConcurrent   int    `toml:"max_concurrent"`
 	Timeout         int    `toml:"timeout"`
+}
+
+// PerformanceConfig contains performance settings
+type PerformanceConfig struct {
+	EnableCache      bool `toml:"enable_cache"`
+	CacheTTL         int  `toml:"cache_ttl"`
+	CacheSizeMB      int  `toml:"cache_size_mb"`
+	EnablePrefetch   bool `toml:"enable_prefetch"`
+	PrefetchIdleDelay int `toml:"prefetch_idle_delay"`
+	ConnectionPoolSize int `toml:"connection_pool_size"`
 }
 
 // DownloadStatus represents the status of a download
@@ -158,4 +170,18 @@ type CertificateInfo struct {
 	Trusted      bool      `json:"trusted"`
 	FirstSeen    time.Time `json:"first_seen"`
 	LastSeen     time.Time `json:"last_seen"`
+}
+
+// SessionTab represents a tab in a saved session
+type SessionTab struct {
+	URL    string `json:"url"`
+	Title  string `json:"title"`
+	Scroll int    `json:"scroll"`
+}
+
+// Session represents a saved browser session
+type Session struct {
+	Tabs        []SessionTab `json:"tabs"`
+	ActiveIndex int          `json:"active_index"`
+	Timestamp   int64        `json:"timestamp"`
 }

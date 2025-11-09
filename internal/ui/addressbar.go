@@ -8,9 +8,10 @@ import (
 
 // AddressBar represents the URL input bar
 type AddressBar struct {
-	input    textinput.Model
-	focused  bool
-	width    int
+	input       textinput.Model
+	focused     bool
+	width       int
+	suggestions *Suggestions
 }
 
 // NewAddressBar creates a new address bar
@@ -21,9 +22,10 @@ func NewAddressBar() *AddressBar {
 	ti.Width = 50
 
 	return &AddressBar{
-		input:   ti,
-		focused: false,
-		width:   80,
+		input:       ti,
+		focused:     false,
+		width:       80,
+		suggestions: NewSuggestions(),
 	}
 }
 
@@ -39,12 +41,34 @@ func (a *AddressBar) Update(msg tea.Msg) (*AddressBar, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		if a.focused {
+			// Handle suggestion navigation first
+			if a.suggestions.IsVisible() {
+				var suggestionCmd tea.Cmd
+				a.suggestions, suggestionCmd = a.suggestions.Update(msg)
+				if suggestionCmd != nil {
+					// Check if a suggestion was selected
+					if selectedMsg, ok := suggestionCmd().(SuggestionSelectedMsg); ok {
+						a.input.SetValue(selectedMsg.URL)
+						a.suggestions.Hide()
+						a.focused = false
+						a.input.Blur()
+						return a, func() tea.Msg { return NavigateMsg{URL: selectedMsg.URL} }
+					}
+					return a, suggestionCmd
+				}
+				// If suggestions handled the key, don't process further
+				if msg.String() == "up" || msg.String() == "down" || msg.String() == "ctrl+p" || msg.String() == "ctrl+n" || msg.String() == "tab" {
+					return a, nil
+				}
+			}
+
 			switch msg.String() {
 			case "enter":
 				// Return the URL and unfocus
 				url := a.input.Value()
 				a.focused = false
 				a.input.Blur()
+				a.suggestions.Hide()
 				if url != "" {
 					return a, func() tea.Msg { return NavigateMsg{URL: url} }
 				}
@@ -53,10 +77,12 @@ func (a *AddressBar) Update(msg tea.Msg) (*AddressBar, tea.Cmd) {
 				// Cancel input
 				a.focused = false
 				a.input.Blur()
+				a.suggestions.Hide()
 				return a, nil
 			case "ctrl+c":
 				// Clear the address bar text
 				a.input.SetValue("")
+				a.suggestions.Hide()
 				return a, nil
 			}
 		}
@@ -88,7 +114,14 @@ func (a *AddressBar) Update(msg tea.Msg) (*AddressBar, tea.Cmd) {
 
 	// Update the input if focused
 	if a.focused {
+		oldValue := a.input.Value()
 		a.input, cmd = a.input.Update(msg)
+		newValue := a.input.Value()
+		
+		// If value changed, update suggestions (will be handled by app)
+		if oldValue != newValue {
+			// Suggestions will be updated by the app based on new value
+		}
 	}
 
 	return a, cmd
@@ -115,7 +148,18 @@ func (a *AddressBar) View() string {
 	// Adjust input width to available space
 	a.input.Width = a.width - 4 // Account for border and padding
 
-	return style.Width(a.width).Render(a.input.View())
+	addressBarView := style.Width(a.width).Render(a.input.View())
+	
+	// Add suggestions if visible
+	if a.suggestions.IsVisible() {
+		a.suggestions.SetWidth(a.width)
+		suggestionsView := a.suggestions.View()
+		if suggestionsView != "" {
+			return addressBarView + "\n" + suggestionsView
+		}
+	}
+	
+	return addressBarView
 }
 
 // Focus sets focus on the address bar
@@ -148,6 +192,20 @@ func (a *AddressBar) SetWidth(width int) {
 // IsFocused returns whether the address bar is focused
 func (a *AddressBar) IsFocused() bool {
 	return a.focused
+}
+
+// UpdateSuggestions updates the suggestions based on query
+func (a *AddressBar) UpdateSuggestions(suggestions []Suggestion) {
+	if a.focused && len(suggestions) > 0 {
+		a.suggestions.Show(suggestions)
+	} else {
+		a.suggestions.Hide()
+	}
+}
+
+// GetSuggestions returns the suggestions component
+func (a *AddressBar) GetSuggestions() *Suggestions {
+	return a.suggestions
 }
 
 // NavigateMsg is sent when the user wants to navigate to a URL
