@@ -5,7 +5,7 @@
 
 A modern, feature-rich Gemini protocol browser built with Go and Bubble Tea TUI framework. Browse Geminispace with full mouse and keyboard support, TOFU certificate handling, and a beautiful terminal interface.
 
-**Available on Linux, macOS, and Windows** through multiple package managers including AUR, Homebrew, and Chocolatey.
+**Currently available on Arch Linux via AUR.** Windows and macOS package store support coming soon!
 
 ## Features
 
@@ -14,6 +14,11 @@ A modern, feature-rich Gemini protocol browser built with Go and Bubble Tea TUI 
 - **TOFU Security**: Trust On First Use certificate management keeps you safe
 - **Beautiful TUI**: Clean, styled interface with syntax highlighting for Gemini documents
 - **Fast & Lightweight**: Native Go performance with minimal resource usage
+- **Session Persistence**: Automatically save and restore tabs, scroll positions, and browsing state
+- **Preset Themes**: Choose from 8 built-in color themes or customize your own
+- **Address Bar Autocomplete**: Smart suggestions from history and bookmarks as you type
+- **History Browser**: Browse and search your full browsing history with keyboard navigation
+- **Page Caching**: Fast page loads with configurable cache (TTL and size limits)
 - **History Navigation**: Full back/forward navigation with persistent history
 - **Bookmarks**: Save and manage your favorite Gemini capsules
 - **Tab Support**: Browse multiple capsules simultaneously with full tab management
@@ -24,11 +29,9 @@ A modern, feature-rich Gemini protocol browser built with Go and Bubble Tea TUI 
 
 ## Installation
 
-Starsearch is available for **Linux**, **macOS**, and **Windows** through multiple package managers.
+### Arch Linux (AUR)
 
-### Linux
-
-#### Arch Linux (AUR)
+Starsearch is currently available on Arch Linux via the AUR:
 
 ```bash
 # Using yay
@@ -36,31 +39,19 @@ yay -S starsearch
 
 # Using paru
 paru -S starsearch
+
+# Or manually
+git clone https://aur.archlinux.org/starsearch.git
+cd starsearch
+makepkg -si
 ```
 
-#### Other Linux Distributions (via Homebrew)
+### Other Platforms
 
-```bash
-brew tap lordbord/starsearch
-brew install starsearch
-```
+**Windows and macOS package store support is planned for the future.** In the meantime, you can:
 
-### macOS
-
-#### Using Homebrew
-
-```bash
-brew tap lordbord/starsearch
-brew install starsearch
-```
-
-### Windows
-
-#### Using Chocolatey
-
-```powershell
-choco install starsearch
-```
+- **Build from source** (see below)
+- **Use pre-built binaries** from GitHub Releases (see below)
 
 ### Pre-built Binaries
 
@@ -108,11 +99,13 @@ The browser will start with an empty page. Use `Ctrl+L` to focus the address bar
 ### Keyboard Shortcuts
 
 #### Navigation
-- `Ctrl+L` - Focus the address bar to enter a URL
+- `Ctrl+L` - Focus the address bar to enter a URL (with autocomplete suggestions)
 - `Enter` - Navigate to the URL in the address bar
 - `R` - Reload the current page
+- `Ctrl+R` - Force reload (bypass cache)
 - `H` / `←` / `Alt+←` - Go back in history
 - `L` / `→` / `Alt+→` - Go forward in history
+- `Ctrl+H` - Open history browser
 - `Esc` - Cancel current input/action
 
 #### Scrolling
@@ -127,9 +120,10 @@ The browser will start with an empty page. Use `Ctrl+L` to focus the address bar
 - `Enter` - Navigate to the selected link
 - Click links with your mouse!
 
-#### Bookmarks
+#### Bookmarks & History
 - `D` - Add current page to bookmarks (or remove if already bookmarked)
 - `B` - Open bookmarks manager
+- `Ctrl+H` - Open history browser with search
 
 #### Search
 - `Ctrl+F` - Open search in page
@@ -197,10 +191,11 @@ Configuration files are stored in:
 
 ### Files
 
-- `config.toml` - User configuration (colors, UI settings, downloads)
+- `config.toml` - User configuration (colors, UI settings, downloads, performance)
 - `known_hosts.json` - TOFU certificate store
 - `bookmarks.json` - Saved bookmarks
 - `history.json` - Browsing history
+- `session.json` - Saved session state (tabs, scroll positions)
 - `downloads.json` - Active and completed downloads
 
 ### Configuration Options
@@ -213,6 +208,7 @@ home_url = "gemini://gemini.circumlunar.space/"
 search_engine = "gemini://gus.guru/"
 max_history = 1000
 auto_save_history = true
+restore_session = true  # Automatically restore tabs and scroll positions on startup
 
 [ui]
 show_line_numbers = false
@@ -221,7 +217,7 @@ enable_mouse = true
 scroll_speed = 3
 
 [colors]
-theme = "default"
+theme = "default"  # Options: default, dark, light, solarized-dark, solarized-light, monochrome, nord, dracula
 link_color = "12"
 visited_link_color = "13"
 heading1_color = "11"
@@ -232,6 +228,14 @@ quote_color = "8"
 preformat_color = "7"
 background_color = "0"
 
+[performance]
+enable_cache = true
+cache_ttl = 3600  # Cache TTL in seconds (1 hour)
+cache_size_mb = 50  # Maximum cache size in MB
+enable_prefetch = false
+prefetch_idle_delay = 2
+connection_pool_size = 2
+
 [downloads]
 directory = "~/Downloads"
 ask_before_download = true
@@ -241,9 +245,14 @@ timeout = 30
 
 ## Development Status
 
-### ✅ v0.1.0 - Ready for Release!
+### ✅ v0.1.3 - Current Release
 
-All major features are complete and the project is ready for its first stable release:
+**Latest Features:**
+- ✅ Session persistence and restoration
+- ✅ Preset themes system (8 built-in themes)
+- ✅ Address bar autocomplete with history/bookmark suggestions
+- ✅ History browser modal with search and navigation
+- ✅ Page caching system with TTL and size limits
 
 **Core Features:**
 - ✅ Full Gemini Protocol Support
@@ -255,19 +264,19 @@ All major features are complete and the project is ready for its first stable re
 - ✅ Search in page functionality
 - ✅ Configuration system with TOML
 
-**Cross-Platform Distribution:**
-- ✅ Pre-built binaries for Linux (x86_64, ARM64), macOS (Intel, Apple Silicon), Windows
-- ✅ AUR package for Arch Linux
-- ✅ Homebrew formula ready (tap setup required)
-- ✅ Chocolatey package ready (submission pending)
+**Distribution:**
+- ✅ AUR package for Arch Linux (available now)
+- 🔄 Windows package store support (planned)
+- 🔄 macOS package store support (planned)
+- ✅ Pre-built binaries available on GitHub Releases
 - ✅ GitHub Actions workflow for automated releases
 
 ### 🔮 Future Enhancements
 Potential areas for future development:
 - Plugin system for custom protocols
-- Session persistence and restoration
 - Advanced bookmark organization (folders, tags)
-- Custom themes and color schemes
+- RSS/Atom feed support
+- Connection pooling and prefetching optimizations
 - Integration with external editors
 - Gemini-to-HTML export functionality
 
