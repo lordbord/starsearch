@@ -5,12 +5,14 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"sync"
 
 	"starsearch/internal/types"
 )
 
 // Bookmarks manages saved bookmarks
 type Bookmarks struct {
+	mu        sync.RWMutex
 	bookmarks []types.Bookmark
 	storePath string
 }
@@ -30,12 +32,15 @@ func NewBookmarks(storePath string) *Bookmarks {
 
 // Add adds a new bookmark
 func (b *Bookmarks) Add(url, title string, tags []string) error {
+	b.mu.Lock()
+
 	// Check if bookmark already exists
 	for i, bm := range b.bookmarks {
 		if bm.URL == url {
 			// Update existing bookmark
 			b.bookmarks[i].Title = title
 			b.bookmarks[i].Tags = tags
+			b.mu.Unlock()
 			return b.Save()
 		}
 	}
@@ -54,27 +59,37 @@ func (b *Bookmarks) Add(url, title string, tags []string) error {
 		return b.bookmarks[i].Title < b.bookmarks[j].Title
 	})
 
+	b.mu.Unlock()
 	return b.Save()
 }
 
 // Remove removes a bookmark by URL
 func (b *Bookmarks) Remove(url string) error {
+	b.mu.Lock()
+
 	for i, bm := range b.bookmarks {
 		if bm.URL == url {
 			// Remove bookmark
 			b.bookmarks = append(b.bookmarks[:i], b.bookmarks[i+1:]...)
+			b.mu.Unlock()
 			return b.Save()
 		}
 	}
 
+	b.mu.Unlock()
 	return nil // URL not found, nothing to remove
 }
 
 // Get gets a bookmark by URL
 func (b *Bookmarks) Get(url string) *types.Bookmark {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+
 	for _, bm := range b.bookmarks {
 		if bm.URL == url {
-			return &bm
+			// Return a copy to prevent external modification
+			bmCopy := bm
+			return &bmCopy
 		}
 	}
 	return nil
@@ -82,11 +97,20 @@ func (b *Bookmarks) Get(url string) *types.Bookmark {
 
 // GetAll returns all bookmarks
 func (b *Bookmarks) GetAll() []types.Bookmark {
-	return b.bookmarks
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+
+	// Return a copy to prevent external modification
+	bookmarks := make([]types.Bookmark, len(b.bookmarks))
+	copy(bookmarks, b.bookmarks)
+	return bookmarks
 }
 
 // GetByTag returns bookmarks with a specific tag
 func (b *Bookmarks) GetByTag(tag string) []types.Bookmark {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+
 	result := make([]types.Bookmark, 0)
 	for _, bm := range b.bookmarks {
 		for _, t := range bm.Tags {
@@ -101,6 +125,9 @@ func (b *Bookmarks) GetByTag(tag string) []types.Bookmark {
 
 // HasBookmark checks if a URL is bookmarked
 func (b *Bookmarks) HasBookmark(url string) bool {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+
 	for _, bm := range b.bookmarks {
 		if bm.URL == url {
 			return true
@@ -111,7 +138,9 @@ func (b *Bookmarks) HasBookmark(url string) bool {
 
 // Clear clears all bookmarks
 func (b *Bookmarks) Clear() error {
+	b.mu.Lock()
 	b.bookmarks = make([]types.Bookmark, 0)
+	b.mu.Unlock()
 	return b.Save()
 }
 
@@ -127,19 +156,26 @@ func (b *Bookmarks) Load() error {
 		return err
 	}
 
+	b.mu.Lock()
 	b.bookmarks = bookmarks
+	b.mu.Unlock()
 	return nil
 }
 
 // Save saves bookmarks to disk
 func (b *Bookmarks) Save() error {
+	b.mu.RLock()
+	bookmarks := make([]types.Bookmark, len(b.bookmarks))
+	copy(bookmarks, b.bookmarks)
+	b.mu.RUnlock()
+
 	// Ensure directory exists
 	dir := filepath.Dir(b.storePath)
 	if err := os.MkdirAll(dir, 0700); err != nil {
 		return err
 	}
 
-	data, err := json.MarshalIndent(b.bookmarks, "", "  ")
+	data, err := json.MarshalIndent(bookmarks, "", "  ")
 	if err != nil {
 		return err
 	}

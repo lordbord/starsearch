@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"starsearch/internal/types"
@@ -11,6 +12,7 @@ import (
 
 // History manages browsing history with back/forward navigation
 type History struct {
+	mu           sync.RWMutex
 	entries      []types.HistoryEntry
 	currentIndex int // Current position in history
 	maxSize      int
@@ -38,6 +40,8 @@ func NewHistory(storePath string, maxSize int) *History {
 
 // Add adds a new entry to the history
 func (h *History) Add(url, title string) {
+	h.mu.Lock()
+
 	// If we're not at the end of history, remove everything after current position
 	if h.currentIndex < len(h.entries)-1 {
 		h.entries = h.entries[:h.currentIndex+1]
@@ -64,13 +68,18 @@ func (h *History) Add(url, title string) {
 		}
 	}
 
-	// Auto-save
+	h.mu.Unlock()
+
+	// Auto-save (release lock before saving to avoid deadlock)
 	_ = h.Save()
 }
 
 // Back moves back in history and returns the URL, or empty string if can't go back
 func (h *History) Back() string {
-	if !h.CanGoBack() {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	if h.currentIndex <= 0 {
 		return ""
 	}
 
@@ -80,7 +89,10 @@ func (h *History) Back() string {
 
 // Forward moves forward in history and returns the URL, or empty string if can't go forward
 func (h *History) Forward() string {
-	if !h.CanGoForward() {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	if h.currentIndex >= len(h.entries)-1 {
 		return ""
 	}
 
@@ -90,16 +102,23 @@ func (h *History) Forward() string {
 
 // CanGoBack returns true if we can go back in history
 func (h *History) CanGoBack() bool {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
 	return h.currentIndex > 0
 }
 
 // CanGoForward returns true if we can go forward in history
 func (h *History) CanGoForward() bool {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
 	return h.currentIndex < len(h.entries)-1
 }
 
 // Current returns the current history entry, or nil if none
 func (h *History) Current() *types.HistoryEntry {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+
 	if h.currentIndex >= 0 && h.currentIndex < len(h.entries) {
 		return &h.entries[h.currentIndex]
 	}
@@ -108,13 +127,21 @@ func (h *History) Current() *types.HistoryEntry {
 
 // GetAll returns all history entries
 func (h *History) GetAll() []types.HistoryEntry {
-	return h.entries
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+
+	// Return a copy to prevent external modification
+	entries := make([]types.HistoryEntry, len(h.entries))
+	copy(entries, h.entries)
+	return entries
 }
 
 // Clear clears all history
 func (h *History) Clear() error {
+	h.mu.Lock()
 	h.entries = make([]types.HistoryEntry, 0)
 	h.currentIndex = -1
+	h.mu.Unlock()
 	return h.Save()
 }
 
@@ -130,6 +157,7 @@ func (h *History) Load() error {
 		return err
 	}
 
+	h.mu.Lock()
 	h.entries = entries
 	// Set current index to end
 	if len(h.entries) > 0 {
@@ -137,19 +165,25 @@ func (h *History) Load() error {
 	} else {
 		h.currentIndex = -1
 	}
+	h.mu.Unlock()
 
 	return nil
 }
 
 // Save saves history to disk
 func (h *History) Save() error {
+	h.mu.RLock()
+	entries := make([]types.HistoryEntry, len(h.entries))
+	copy(entries, h.entries)
+	h.mu.RUnlock()
+
 	// Ensure directory exists
 	dir := filepath.Dir(h.storePath)
 	if err := os.MkdirAll(dir, 0700); err != nil {
 		return err
 	}
 
-	data, err := json.MarshalIndent(h.entries, "", "  ")
+	data, err := json.MarshalIndent(entries, "", "  ")
 	if err != nil {
 		return err
 	}

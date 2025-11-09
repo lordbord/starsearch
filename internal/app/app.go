@@ -59,6 +59,8 @@ type Model struct {
 	isNavigating   bool   // Whether currently navigating (to avoid adding to history during back/forward)
 	initialURL     string // Initial URL to navigate to on startup
 	forceReload    bool   // Whether to bypass cache for next navigation
+	redirectCount  int    // Current redirect count for loop detection
+	redirectLimit  int    // Maximum number of redirects allowed (default: 10)
 }
 
 // NewModel creates a new application model
@@ -141,6 +143,8 @@ func NewModel(initialURL string) (*Model, error) {
 		width:          80,
 		height:         24,
 		initialURL:     initialURL,
+		redirectLimit:  10, // Default redirect limit
+		redirectCount:  0,
 	}
 
 	// Apply theme colors to viewport
@@ -669,6 +673,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		if msg.err != nil {
 			m.statusBar.SetError(msg.err.Error())
+			m.redirectCount = 0 // Reset redirect count on error
 			m.saveCurrentTabState()
 			return m, nil
 		}
@@ -694,6 +699,9 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// Get title from URL for Gopher
 			title := msg.resp.URL
 			m.statusBar.SetMessage(fmt.Sprintf("Loaded: %s", title))
+
+				// Reset redirect count on successful response
+				m.redirectCount = 0
 
 				// Add to history (unless we're navigating back/forward)
 				if !m.isNavigating {
@@ -752,6 +760,9 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				title := msg.resp.URL
 				m.statusBar.SetMessage(fmt.Sprintf("Image loaded: %s", mimeType))
 
+					// Reset redirect count on successful response
+					m.redirectCount = 0
+
 					// Add to history
 					if !m.isNavigating {
 						m.history.Add(m.currentURL, title)
@@ -781,6 +792,9 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				title := gemini.GetTitle(doc)
 				m.statusBar.SetMessage(fmt.Sprintf("Loaded: %s", title))
 
+					// Reset redirect count on successful response
+					m.redirectCount = 0
+
 					// Add to history (unless we're navigating back/forward)
 					if !m.isNavigating {
 						m.history.Add(m.currentURL, title)
@@ -792,9 +806,23 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 
 		} else if gemini.IsRedirectStatus(msg.resp.Status) {
-			// Handle redirect
+			// Handle redirect with loop protection
+			m.redirectCount++
+			if m.redirectCount > m.redirectLimit {
+				m.statusBar.SetError(fmt.Sprintf("Too many redirects (limit: %d). Possible redirect loop.", m.redirectLimit))
+				m.redirectCount = 0 // Reset for next navigation
+				return m, nil
+			}
+
 			newURL := msg.resp.Meta
-			m.statusBar.SetMessage(fmt.Sprintf("Redirecting to: %s", newURL))
+			if newURL == "" {
+				m.statusBar.SetError("Redirect URL is empty")
+				m.redirectCount = 0
+				return m, nil
+			}
+
+			m.statusBar.SetMessage(fmt.Sprintf("Redirecting to: %s (%d/%d)", newURL, m.redirectCount, m.redirectLimit))
+			// Don't reset redirectCount - keep it for the next navigate call
 			return m, m.navigate(newURL)
 
 		} else if gemini.IsInputStatus(msg.resp.Status) {
@@ -816,6 +844,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		} else {
 			// Handle error status
+			m.redirectCount = 0 // Reset redirect count on error
 			statusMsg := gemini.GetStatusMessage(msg.resp.Status)
 			m.statusBar.SetError(fmt.Sprintf("%s: %s", statusMsg, msg.resp.Meta))
 		}

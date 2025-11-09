@@ -188,7 +188,10 @@ func (d *Downloads) Load() error {
 		return err
 	}
 
+	// Protect assignment with mutex to prevent race conditions
+	d.mutex.Lock()
 	d.downloads = downloads
+	d.mutex.Unlock()
 	return nil
 }
 
