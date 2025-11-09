@@ -14,13 +14,15 @@ type StatusBar struct {
 	width        int
 	isLoading    bool
 	errorMsg     string
+	version      string
 }
 
 // NewStatusBar creates a new status bar
-func NewStatusBar(width int) *StatusBar {
+func NewStatusBar(width int, version string) *StatusBar {
 	return &StatusBar{
 		width:   width,
 		message: "Ready",
+		version: version,
 	}
 }
 
@@ -106,9 +108,13 @@ func (s *StatusBar) View() string {
 		middleSection = urlStyle.Render(" " + displayURL + " ")
 	}
 
-	// Right section: Scroll position
+	// Right section: Scroll position and version
 	scrollText := fmt.Sprintf("%.0f%%", s.scrollPercent*100)
-	rightSection := scrollStyle.Render(" " + scrollText + " ")
+	versionText := ""
+	if s.version != "" {
+		versionText = " v" + s.version
+	}
+	rightSection := scrollStyle.Render(" " + scrollText + versionText + " ")
 
 	// Calculate spacing
 	usedWidth := lipgloss.Width(leftSection) + lipgloss.Width(middleSection) + lipgloss.Width(rightSection)

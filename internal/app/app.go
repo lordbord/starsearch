@@ -64,7 +64,7 @@ type Model struct {
 }
 
 // NewModel creates a new application model
-func NewModel(initialURL string) (*Model, error) {
+func NewModel(initialURL string, version string) (*Model, error) {
 	// Get config directory
 	configDir, err := os.UserConfigDir()
 	if err != nil {
@@ -111,7 +111,7 @@ func NewModel(initialURL string) (*Model, error) {
 	// Create UI components
 	addressBar := ui.NewAddressBar()
 	viewport := ui.NewContentViewport(80, 20)
-	statusBar := ui.NewStatusBar(80)
+	statusBar := ui.NewStatusBar(80, version)
 	tabBar := ui.NewTabBar()
 	helpModal := ui.NewHelpModal()
 	inputModal := ui.NewInputModal()

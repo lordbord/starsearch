@@ -9,15 +9,23 @@ import (
 	"starsearch/internal/app"
 )
 
+const version = "0.1.2"
+
 func main() {
+	// Handle version flag
+	if len(os.Args) > 1 && (os.Args[1] == "--version" || os.Args[1] == "-v") {
+		fmt.Printf("starsearch v%s\n", version)
+		os.Exit(0)
+	}
+
 	// Get initial URL from command-line arguments if provided
 	var initialURL string
 	if len(os.Args) > 1 {
 		initialURL = os.Args[1]
 	}
 
-	// Create the application model
-	model, err := app.NewModel(initialURL)
+	// Create the application model with version
+	model, err := app.NewModel(initialURL, version)
 	if err != nil {
 		log.Fatal(err)
 	}
