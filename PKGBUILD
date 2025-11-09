@@ -8,7 +8,7 @@ url="https://github.com/lordbord/starsearch"
 license=('MIT')
 makedepends=('go')
 source=("$pkgname-$pkgver.tar.gz::https://github.com/lordbord/starsearch/archive/v$pkgver.tar.gz")
-sha256sums=('abb92109c77cad43d2e8cdb56bd1c640b5a0bb0b57c842e216615d0ab4503db8')
+sha256sums=('631371db6ef54eb8d750f119d0bd07af3182708d1d99da55bb2499b38374fe69')
 
 build() {
     cd "$pkgname-$pkgver"
